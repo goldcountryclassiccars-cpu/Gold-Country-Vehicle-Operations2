@@ -33,15 +33,24 @@ anyone who guesses a URL.
 
 1. Create a project at supabase.com. Choose a region near the dealership.
    Save the database password it generates; it appears once.
-2. **Project Settings → Database → Connection string → URI.** You need two
-   forms of it:
-   - **Pooled** (host contains `pooler`, port `6543`) → this becomes
-     `DATABASE_URL`. Append `?pgbouncer=true&connection_limit=1`.
-   - **Direct** (port `5432`) → this becomes `DIRECT_URL`.
+2. **Connect** (top of the project dashboard). Supabase offers three connection
+   strings; take these two, and note that neither of them is the one labelled
+   "Direct connection":
+   - **Transaction pooler**, port `6543` → `DATABASE_URL`. Append
+     `?pgbouncer=true&connection_limit=1`.
+   - **Session pooler**, port `5432` → `DIRECT_URL`.
 
-   Both are required. Serverless functions open far more connections than
-   Postgres tolerates, so normal queries go through the pooler; migrations need
-   a direct connection because the pooler cannot run them.
+   Two are needed because serverless functions open far more connections than
+   Postgres tolerates, so ordinary queries go through the transaction pooler,
+   while migrations need a session-mode connection (the transaction pooler does
+   not support the prepared statements Prisma's migration engine issues).
+
+   **Do not use "Direct connection" here even though the name matches the
+   variable.** Supabase serves it over IPv6 only, unless the paid IPv4 add-on is
+   enabled, and Vercel's build and function environments are IPv4. The failure
+   looks like a hostname that will not resolve during `prisma migrate deploy` —
+   easy to misread as a wrong password. The session pooler is IPv4 on every
+   tier and is the supported substitute.
 3. **Storage → New bucket.** Name it `gccc-media`. Leave **Public** switched
    **off**.
 4. **Project Settings → Storage → S3 access keys → New access key.** Copy the
@@ -63,8 +72,8 @@ anyone who guesses a URL.
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | Supabase **pooled** URI + `?pgbouncer=true&connection_limit=1` |
-| `DIRECT_URL` | Supabase **direct** URI (port 5432) |
+| `DATABASE_URL` | Supabase **transaction pooler** URI (6543) + `?pgbouncer=true&connection_limit=1` |
+| `DIRECT_URL` | Supabase **session pooler** URI (5432) — not "Direct connection" |
 | `SESSION_SECRET` | 32+ random bytes — `openssl rand -base64 32` |
 | `APP_URL` | `https://<your-project>.vercel.app` |
 | `STORAGE_ADAPTER` | `s3` |
@@ -92,11 +101,12 @@ run twice against real inventory. From a machine with Node installed and the
 repository checked out:
 
 ```
-DIRECT_URL="<supabase direct uri>" DATABASE_URL="<supabase direct uri>" npm run db:seed
+DATABASE_URL="<session pooler uri>" DIRECT_URL="<session pooler uri>" npm run db:seed
 ```
 
-Use the **direct** URI for both, not the pooled one. This creates 8 departments,
-10 roles, 12 demo users, 4 vehicles and their supporting records.
+Use the **session pooler** URI for both — the seed script writes in long
+transactions, which the transaction pooler will not hold. This creates 8
+departments, 10 roles, 12 demo users, 4 vehicles and their supporting records.
 
 ## 4. First login, and the thing to do immediately
 
