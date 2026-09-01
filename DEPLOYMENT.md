@@ -51,7 +51,9 @@ anyone who guesses a URL.
 ## 2. Vercel — the app
 
 1. Sign in at vercel.com with GitHub and import
-   `goldcountryclassiccars-cpu/Gold-Country-Vehicle-Operations2`.
+   `goldcountryclassiccars-cpu/Gold-Country-Vehicle-Operations2`. When asked
+   whether the work is personal or commercial, answer **commercial** — see
+   "Cost, honestly" below for why this is not optional.
 2. Framework preset: **Next.js**. Leave the build settings alone — the repo
    defines a `vercel-build` script that applies database migrations before
    building, so schema changes deploy automatically.
@@ -128,10 +130,24 @@ Deploying does not make these real. They are known gaps, not bugs:
 
 ## Cost, honestly
 
-Both free tiers cover this workload. The limits worth knowing: Supabase pauses
-a free project after a week with no activity (it resumes on the next request,
-after a delay), and free Postgres storage is 500MB — ample for records, but
-vehicle photos go to the storage bucket, whose free allowance is 1GB. A few
-hundred high-resolution photos will exceed that. Supabase Pro is currently
-around $25/month and lifts both; Vercel Hobby is likely to remain sufficient
-unless the app is opened to the public.
+**Vercel requires a paid plan here.** Its Hobby tier is restricted to
+non-commercial personal use, and it defines commercial usage as any deployment
+"used for the purpose of financial gain of anyone involved in any part of the
+production of the project." An internal system that tracks inventory, deal
+margins and consignor settlements for a working dealership is commercial under
+that definition, even though nothing is sold through it and it is never public.
+When Vercel asks during signup, answer **commercial**. That means Pro, at $20
+per month per developer seat — viewer seats are free, so one seat is enough.
+
+Supabase carries no equivalent restriction; its free plan may be used
+commercially. What limits it is capacity, not licensing:
+
+- **500MB database.** Ample. These are text records; it will not be the binding
+  constraint.
+- **1GB file storage.** This *is* the binding constraint. Vehicle photography
+  at full resolution runs 3–8MB per image, so a few hundred photos exhausts it.
+- **Project pausing.** A free project pauses after a week with no activity and
+  resumes on the next request after a delay. Daily use prevents this.
+
+Supabase Pro is around $25/month and lifts all three. A sensible sequence is to
+start free, and move to Pro when photo storage — not anything else — forces it.
