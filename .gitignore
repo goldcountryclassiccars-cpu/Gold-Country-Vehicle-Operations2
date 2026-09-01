@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# production
+build/
+
+# env — never commit credentials
+.env
+.env.local
+.env.*.local
+
+# local file storage (development storage adapter)
+storage/
+
+# database
+*.sqlite
+
+# test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store

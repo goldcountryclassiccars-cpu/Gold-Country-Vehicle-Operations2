@@ -1,0 +1,423 @@
+// DRAFT — Phase 2 domain models. Merged into schema.prisma (with a migration)
+// when Phase 2 begins. Kept separate so Phase 1 migrations stay clean.
+
+// ---------------------------------------------------------------------------
+// Files (storage abstraction metadata — private by default)
+// ---------------------------------------------------------------------------
+
+model FileObject {
+  id           String   @id @default(uuid())
+  storageKey   String   @unique // adapter-specific key; never a public URL
+  adapter      String // "local" | "s3"
+  originalName String
+  contentType  String
+  sizeBytes    Int
+  sha256       String?
+  uploadedBy   String? // userId
+  createdAt    DateTime @default(now())
+  // Sensitive files (titles, signed docs, IDs) get a sensitivity key that maps
+  // to a field grant checked before any download.
+  sensitivity  String? // e.g. "title_docs", "signed_docs", "id_docs"
+}
+
+// ---------------------------------------------------------------------------
+// Parties (people and organizations, reused across modules)
+// ---------------------------------------------------------------------------
+
+enum PartyKind {
+  PERSON
+  ORGANIZATION
+}
+
+model Party {
+  id           String    @id @default(uuid())
+  kind         PartyKind
+  displayName  String
+  firstName    String?
+  lastName     String?
+  organization String?
+  email        String?
+  phone        String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String?   @default("US")
+  notes        String?
+  // Distinguishes vendor/carrier parties that can hold restricted user accounts
+  isVendor     Boolean   @default(false)
+  isCarrier    Boolean   @default(false)
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  archivedAt   DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle (permanent identity)
+// ---------------------------------------------------------------------------
+
+enum MileageStatus {
+  ACTUAL
+  EXEMPT
+  NOT_ACTUAL
+  TMU // true mileage unknown
+  BROKEN_ODOMETER
+  UNKNOWN
+}
+
+model Vehicle {
+  id                    String        @id @default(uuid())
+  year                  Int?
+  make                  String
+  model                 String
+  trim                  String?
+  bodyStyle             String?
+  exteriorColor         String?
+  interiorColor         String?
+  engineDescription     String?
+  transmission          String?
+  drivetrain            String?
+  mileage               Int?
+  mileageStatus         MileageStatus @default(UNKNOWN)
+  titleBrand            String?
+  buildDate             String?
+  matchingNumbers       String? // "yes" | "no" | "partial" | "unverified"
+  originalityNotes      String?
+  modifications         String?
+  restorationHistory    String?
+  provenance            String?
+  generalDescription    String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  identifiers VehicleIdentifier[]
+  episodes    InventoryEpisode[]
+}
+
+enum IdentifierType {
+  VIN
+  SHORT_VIN
+  CHASSIS_NUMBER
+  SERIAL_NUMBER
+  ENGINE_NUMBER
+  BODY_NUMBER
+  COWL_TAG
+  OTHER
+  UNKNOWN_PENDING
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  MISMATCH
+}
+
+// No length constraint anywhere — classic cars have short, nonstandard IDs.
+model VehicleIdentifier {
+  id           String             @id @default(uuid())
+  vehicle      Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId    String
+  type         IdentifierType
+  value        String
+  isPrimary    Boolean            @default(false)
+  verification VerificationStatus @default(UNVERIFIED)
+  verifiedById String?
+  verifiedAt   DateTime?
+  notes        String?
+  photoFileId  String?
+  createdAt    DateTime           @default(now())
+
+  @@index([vehicleId])
+  @@index([value])
+}
+
+// ---------------------------------------------------------------------------
+// Inventory episode (one period of possession/marketing) + parallel statuses
+// ---------------------------------------------------------------------------
+
+enum DealType {
+  DEALER_PURCHASE
+  CONSIGNMENT
+  BROKERAGE
+  OTHER
+}
+
+enum CustodyStatus {
+  EXPECTED
+  INBOUND_TRANSPORT
+  ON_SITE
+  DETAIL_AREA
+  MECHANICAL_AREA
+  BODY_SHOP
+  MEDIA_AREA
+  OFFSITE_VENDOR
+  AUTOMOTIVE_EVENT
+  TEST_DRIVE
+  TRANSPORT_STAGING
+  CARRIER_POSSESSION
+  DELIVERED
+  RETURNED_TO_CONSIGNOR
+}
+
+enum ReconditioningStatus {
+  NOT_ASSESSED
+  INSPECTION_SCHEDULED
+  INSPECTION_IN_PROGRESS
+  AWAITING_ESTIMATE
+  AWAITING_APPROVAL
+  AWAITING_CONSIGNOR_APPROVAL
+  AWAITING_PARTS
+  WORK_IN_PROGRESS
+  QUALITY_CONTROL
+  COMPLETE
+  WORK_DECLINED
+  NO_WORK_REQUIRED
+}
+
+enum MarketingStatus {
+  NOT_READY
+  MEDIA_PENDING
+  MEDIA_IN_PROGRESS
+  LISTING_PACKAGE_INCOMPLETE
+  READY_FOR_LISTING
+  SUBMITTED_TO_LISTING_SYSTEM
+  LIVE
+  PAUSED
+  WITHDRAWN
+  MARKED_SOLD
+}
+
+enum SalesStatus {
+  AVAILABLE
+  INQUIRY_ACTIVITY
+  HOLD
+  DEPOSIT_REQUESTED
+  DEPOSIT_RECEIVED
+  CONTRACTED
+  FUNDS_PENDING
+  FUNDED
+  READY_FOR_RELEASE
+  RELEASED
+  DELIVERED
+  CANCELED
+  UNWOUND
+}
+
+enum DocStatus {
+  NOT_STARTED
+  MISSING_SELLER_DOCUMENTS
+  MISSING_BUYER_DATA
+  READY_TO_GENERATE
+  GENERATED
+  SENT
+  PARTIALLY_SIGNED
+  ESIGN_COMPLETE
+  ORIGINALS_PENDING
+  COMPLETE
+  FILED
+}
+
+enum FinancialCloseStatus {
+  ESTIMATING
+  EXPENSES_INCOMPLETE
+  BUYER_FUNDS_PENDING
+  BUYER_FUNDED
+  CONSIGNOR_PAYABLE
+  PAYOUT_APPROVAL_PENDING
+  PAYOUT_COMPLETE
+  FINAL_RECONCILIATION_PENDING
+  FINANCIALLY_CLOSED
+}
+
+model AcquisitionSource {
+  id     String  @id @default(uuid())
+  key    String  @unique
+  name   String
+  active Boolean @default(true)
+}
+
+model InventoryEpisode {
+  id                   String               @id @default(uuid())
+  vehicle              Vehicle              @relation(fields: [vehicleId], references: [id])
+  vehicleId            String
+  stockNumber          String               @unique
+  dealType             DealType
+  acquisitionSourceId  String?
+  acceptedAt           DateTime?
+  expectedArrivalAt    DateTime?
+  actualArrivalAt      DateTime?
+  departedAt           DateTime?
+  currentLocationId    String?
+  custodyStatus        CustodyStatus        @default(EXPECTED)
+  reconditioningStatus ReconditioningStatus @default(NOT_ASSESSED)
+  marketingStatus      MarketingStatus      @default(NOT_READY)
+  salesStatus          SalesStatus          @default(AVAILABLE)
+  documentStatus       DocStatus            @default(NOT_STARTED)
+  financialCloseStatus FinancialCloseStatus @default(ESTIMATING)
+  salespersonId        String? // assigned salesperson (User)
+  operationsOwnerId    String? // assigned operations owner (User)
+  askingPrice          Decimal?             @db.Decimal(12, 2)
+  priceReviewAt        DateTime?
+  firstListedAt        DateTime?
+  active               Boolean              @default(true)
+  archivedAt           DateTime?
+  closedAt             DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  arrangement Arrangement?
+  intake      IntakeRecord?
+
+  @@index([vehicleId])
+  @@index([active])
+  @@index([salesStatus])
+}
+
+// Generic append-only status history for every status dimension + prices.
+model StatusChange {
+  id         String   @id @default(uuid())
+  episodeId  String
+  dimension  String // "custody" | "reconditioning" | "marketing" | "sales" | "document" | "financial" | "asking_price" | "location"
+  fromValue  String?
+  toValue    String
+  reason     String?
+  changedBy  String? // userId
+  createdAt  DateTime @default(now())
+
+  @@index([episodeId, dimension])
+}
+
+// ---------------------------------------------------------------------------
+// Acquisition / consignment arrangement (confidential terms)
+// ---------------------------------------------------------------------------
+
+model Arrangement {
+  id                      String    @id @default(uuid())
+  episode                 InventoryEpisode @relation(fields: [episodeId], references: [id])
+  episodeId               String    @unique
+  sellerPartyId           String? // seller or consignor
+  // Confidential economics — protected by field grants
+  purchasePrice           Decimal?  @db.Decimal(12, 2) // dealer purchase
+  guaranteedConsignorNet  Decimal?  @db.Decimal(12, 2)
+  commissionStructure     Json? // { type: "percent"|"flat"|"markup", value, minimum? }
+  reserveAmount           Decimal?  @db.Decimal(12, 2)
+  minimumAcceptablePrice  Decimal?  @db.Decimal(12, 2)
+  askingPriceAuthority    String?
+  priceReductionAuthority String?
+  agreementStartAt        DateTime?
+  agreementExpiresAt      DateTime?
+  renewalTerms            String?
+  expenseResponsibility   String? // narrative default; per-expense field is authoritative
+  insuranceResponsibility String?
+  titleStatus             String? // "present" | "missing" | "lien" | "pending" ...
+  lienStatus              String?
+  lienholderPartyId       String?
+  ownerNotes              String? // owner_notes field grant
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Locations, custody, related items
+// ---------------------------------------------------------------------------
+
+model Location {
+  id       String  @id @default(uuid())
+  key      String  @unique
+  name     String
+  kind     String // "on_site" | "vendor" | "event" | "transport" | "other"
+  address  String?
+  active   Boolean @default(true)
+}
+
+model VehicleLocationEvent {
+  id             String   @id @default(uuid())
+  episodeId      String
+  fromLocationId String?
+  toLocationId   String
+  movedById      String?
+  reason         String?
+  photoFileId    String?
+  createdAt      DateTime @default(now())
+
+  @@index([episodeId])
+}
+
+enum RelatedItemType {
+  KEYS
+  TITLE
+  REGISTRATION
+  SERVICE_RECORDS
+  MANUALS
+  TOOL_KIT
+  SPARE_PARTS
+  EXTRA_WHEELS
+  REMOVABLE_TOP
+  CAR_COVER
+  OTHER
+}
+
+model RelatedItem {
+  id                String          @id @default(uuid())
+  episodeId         String
+  type              RelatedItemType
+  description       String?
+  currentLocationId String?
+  createdAt         DateTime        @default(now())
+
+  @@index([episodeId])
+}
+
+model RelatedItemLocationEvent {
+  id             String   @id @default(uuid())
+  relatedItemId  String
+  fromLocationId String?
+  toLocationId   String
+  movedById      String?
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  @@index([relatedItemId])
+}
+
+// ---------------------------------------------------------------------------
+// Intake (mobile-friendly, draft/resumable)
+// ---------------------------------------------------------------------------
+
+model IntakeRecord {
+  id                    String    @id @default(uuid())
+  episode               InventoryEpisode @relation(fields: [episodeId], references: [id])
+  episodeId             String    @unique
+  status                String    @default("draft") // draft | complete
+  receivedAt            DateTime?
+  receivedById          String?
+  arrivalMethod         String? // "carrier" | "driven" | "towed" | "other"
+  carrierPartyId        String?
+  odometerReading       Int?
+  mileageStatus         MileageStatus?
+  identityVerified      Boolean?
+  starts                Boolean?
+  runs                  Boolean?
+  drives                Boolean?
+  stops                 Boolean?
+  fuelLevel             String?
+  exteriorDamageNotes   String?
+  interiorDamageNotes   String?
+  glassCondition        String?
+  tireCondition         String?
+  transportDamageNotes  String?
+  sellerReportedIssues  String?
+  keysReceived          Int?
+  documentsReceived     String?
+  accessoriesReceived   String?
+  safetyConcerns        String?
+  initialLocationId     String?
+  notes                 String?
+  draftData             Json? // autosaved wizard state
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}

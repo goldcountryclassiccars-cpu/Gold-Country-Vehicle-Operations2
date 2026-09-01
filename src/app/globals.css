@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Understated, trustworthy palette for a boutique classic-car dealership */
+  --color-brand-50: #f7f6f2;
+  --color-brand-100: #ebe8df;
+  --color-brand-200: #d6d0bf;
+  --color-brand-600: #6b5d3f;
+  --color-brand-700: #57492e;
+  --color-brand-800: #423721;
+  --color-brand-900: #2e2617;
+
+  --color-ink-900: #1c1c1a;
+  --color-ink-700: #44443f;
+  --color-ink-500: #6f6f68;
+  --color-ink-300: #b9b9b0;
+  --color-ink-100: #ecece7;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-stone-50 text-stone-900 antialiased;
+}
+
+/* Visible focus for keyboard navigation (WCAG 2.1 AA) */
+:focus-visible {
+  outline: 2px solid #57492e;
+  outline-offset: 2px;
+}
