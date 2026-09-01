@@ -1,10 +1,16 @@
 /**
  * File storage abstraction. Development uses the local filesystem; production
- * uses an S3-compatible adapter (interface defined, implementation pending
- * credentials). Files are private by default — downloads go through an
+ * uses the S3-compatible adapter (any S3 API: Supabase Storage, Cloudflare R2,
+ * MinIO, AWS S3). Files are private by default — downloads go through an
  * authorized endpoint that checks permissions and (for sensitive files) the
  * matching field grant. Bucket paths / storage keys are never exposed as URLs.
  */
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { createHash, randomUUID } from "crypto";
 import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
@@ -41,18 +47,48 @@ class LocalStorageAdapter implements StorageAdapter {
 }
 
 /**
- * S3-compatible adapter interface stub. Wire up with the AWS SDK (or any
- * S3-compatible client) when production credentials exist; see README.
+ * S3-compatible adapter. Works against any S3 API implementation — Supabase
+ * Storage, Cloudflare R2, MinIO, AWS S3 itself. Objects are written with no
+ * public ACL: the bucket stays private and every read goes back through
+ * /api/files/[id], which checks the permission and field grant first. That is
+ * the whole point of returning a Buffer here rather than handing out a URL.
  */
 class S3StorageAdapter implements StorageAdapter {
-  async put(): Promise<void> {
-    throw new Error("S3 adapter not configured. Set STORAGE_ADAPTER=local for development.");
+  private client: S3Client;
+  private bucket: string;
+
+  constructor() {
+    const c = config();
+    this.bucket = c.S3_BUCKET!;
+    this.client = new S3Client({
+      region: c.S3_REGION,
+      endpoint: c.S3_ENDPOINT,
+      forcePathStyle: c.S3_FORCE_PATH_STYLE,
+      credentials: {
+        accessKeyId: c.S3_ACCESS_KEY_ID!,
+        secretAccessKey: c.S3_SECRET_ACCESS_KEY!,
+      },
+    });
   }
-  async get(): Promise<Buffer> {
-    throw new Error("S3 adapter not configured.");
+
+  async put(key: string, data: Buffer): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data }),
+    );
   }
-  async delete(): Promise<void> {
-    throw new Error("S3 adapter not configured.");
+
+  async get(key: string): Promise<Buffer> {
+    const res = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    if (!res.Body) throw new Error(`Storage object ${key} has no body`);
+    return Buffer.from(await res.Body.transformToByteArray());
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
   }
 }
 

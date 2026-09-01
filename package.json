@@ -2,7 +2,7 @@
   "name": "gccc-ops",
   "version": "0.1.0",
   "private": true,
-  "description": "Gold Country Classic Cars — Vehicle Operations Platform",
+  "description": "Gold Country Classic Cars \u2014 Vehicle Operations Platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -18,12 +18,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "setup": "npm install && npm run db:up && npm run db:migrate && npm run db:seed"
+    "setup": "npm install && npm run db:up && npm run db:migrate && npm run db:seed",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma migrate deploy && next build"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1124.0",
     "@prisma/client": "^6",
     "@tanstack/react-table": "^8",
     "bcryptjs": "^2.4.3",
@@ -52,6 +55,7 @@
     "eslint": "^9",
     "eslint-config-next": "^15",
     "prisma": "^6",
+    "s3rver": "^3.7.1",
     "tailwindcss": "^4",
     "tsx": "^4.19",
     "typescript": "^5.7",

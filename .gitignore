@@ -31,3 +31,6 @@ npm-debug.log*
 
 # OS
 .DS_Store
+
+# typescript incremental build cache (was committed by accident)
+*.tsbuildinfo

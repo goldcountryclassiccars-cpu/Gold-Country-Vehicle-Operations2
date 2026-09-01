@@ -8,7 +8,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Pooled connection — serverless hosts open far more connections than a
+  // Postgres server will tolerate, so the app talks to a pooler (PgBouncer).
+  url       = env("DATABASE_URL")
+  // Migrations need a direct, unpooled connection; falls back to DATABASE_URL
+  // in development where the two are the same.
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------

@@ -132,10 +132,11 @@ tests; consignments screen shows terms only with the consignor_terms grant.
 - Fine-grained per-grant role editing UI (grants are data; reset-to-template
   ships now).
 - Reacquisition flow UI (new episode for an existing vehicle; model supports it).
-- Real S3 storage, SMTP email, and a production e-signature provider (adapter
-  interfaces are in place; development uses local/log/mock).
+- SMTP email and a production e-signature provider (adapter interfaces are in
+  place; development uses log/mock). S3-compatible storage is now implemented
+  and covered by tests — see DEPLOYMENT.md.
 - Playwright e2e suite (config present; unit + DB integration suites cover the
-  engine and services — 59 tests).
+  engine and services — 64 tests).
 - Production hardening: Redis-backed rate limiting, CSRF review, backup policy.
 
 ## Known limitations
