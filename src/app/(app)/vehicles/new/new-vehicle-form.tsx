@@ -101,7 +101,7 @@ export function NewVehicleForm({
               ))}
             </select>
           </Field>
-          <Field label="Identifier value" htmlFor="identifierValue">
+          <Field label="VIN or number" htmlFor="identifierValue">
             <input id="identifierValue" name="identifierValue" className={inputClass} />
           </Field>
         </div>

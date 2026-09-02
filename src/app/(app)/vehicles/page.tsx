@@ -71,7 +71,7 @@ export default async function VehiclesPage({
           name="q"
           type="search"
           defaultValue={q ?? ""}
-          placeholder="Search make, model, identifier, stock number…"
+          placeholder="Search make, model, VIN, stock number…"
           className="w-full max-w-md rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm"
         />
       </form>
@@ -84,7 +84,7 @@ export default async function VehiclesPage({
             <thead className="border-b border-stone-200 bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
               <tr>
                 <th scope="col" className="px-4 py-3">Vehicle</th>
-                <th scope="col" className="px-4 py-3">Identifier</th>
+                <th scope="col" className="px-4 py-3">VIN</th>
                 <th scope="col" className="px-4 py-3">Stock #</th>
                 <th scope="col" className="px-4 py-3">Deal type</th>
                 <th scope="col" className="px-4 py-3">Stage</th>

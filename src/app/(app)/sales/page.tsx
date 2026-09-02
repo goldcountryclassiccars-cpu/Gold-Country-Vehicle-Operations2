@@ -8,7 +8,7 @@ import { createSaleAction } from "@/modules/sales/actions";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { Badge, Card, EmptyState, PageHeader, inputClass } from "@/components/ui";
 
-export const metadata: Metadata = { title: "Sales" };
+export const metadata: Metadata = { title: "Deals in Progress" };
 
 const statusTone = {
   DRAFT: "neutral",
@@ -53,7 +53,7 @@ export default async function SalesPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <PageHeader title="Sales" subtitle="Deals from first deposit through delivery. Canceled deals stay on record." />
+      <PageHeader title="Deals in Progress" subtitle="Deals from first deposit through delivery. Canceled deals stay on record." />
 
       {availableEpisodes.length > 0 ? (
         <Card className="mb-6">

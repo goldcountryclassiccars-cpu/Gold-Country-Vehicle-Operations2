@@ -23,22 +23,43 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/pipeline", label: "Pipeline", icon: "Kanban", requires: { resource: "episodes", action: "view" } },
   { href: "/inspections", label: "Inspections", icon: "Search", requires: { resource: "inspections", action: "view" } },
   { href: "/work-orders", label: "Work Orders", icon: "Wrench", requires: { resource: "work_orders", action: "view" } },
-  { href: "/approvals", label: "Approvals", icon: "BadgeCheck", requires: { resource: "approvals", action: "approve" } },
   { href: "/expenses", label: "Expenses", icon: "Receipt", requires: { resource: "expenses", action: "view" } },
   { href: "/profitability", label: "Profitability", icon: "TrendingUp", requires: { resource: "profitability", action: "view" } },
   { href: "/media", label: "Media", icon: "Camera", requires: { resource: "media", action: "view" } },
-  { href: "/listings", label: "Listings", icon: "Megaphone", requires: { resource: "listings", action: "view" } },
-  { href: "/sales", label: "Sales", icon: "Handshake", requires: { resource: "sales", action: "view" } },
-  { href: "/closing", label: "Closing Desk", icon: "FileCheck", requires: { resource: "payments", action: "view" } },
+  { href: "/sales", label: "Deals in Progress", icon: "Handshake", requires: { resource: "sales", action: "view" } },
   { href: "/documents", label: "Documents", icon: "FileText", requires: { resource: "documents", action: "view" } },
-  { href: "/transport", label: "Transport", icon: "Truck", requires: { resource: "transport", action: "view" } },
-  { href: "/consignments", label: "Consignments", icon: "FileSignature", requires: { resource: "consignments", action: "view" } },
-  { href: "/settlements", label: "Settlements", icon: "Banknote", requires: { resource: "settlements", action: "view" } },
   { href: "/reports", label: "Reports", icon: "BarChart3", requires: { resource: "reports", action: "view" } },
   { href: "/archive", label: "Sold Archive", icon: "Archive", requires: { resource: "archive", action: "view" } },
-  { href: "/integrations", label: "Integrations", icon: "Plug", requires: { resource: "integrations", action: "view" } },
   { href: "/admin", label: "Administration", icon: "Settings", requires: { resource: "admin", action: "manage_config" } },
 ];
+
+/**
+ * Removed from the sidebar deliberately, 2026-09: Approvals, Listings, Closing
+ * Desk, Transport, Consignments, Settlements, Integrations.
+ *
+ * The routes still exist and still enforce permissions — they are unlinked, not
+ * deleted, because several carry logic the business still depends on:
+ *
+ * - /closing holds the release gate (a vehicle should not leave before it is
+ *   funded and the paperwork is signed). That check is being moved onto the
+ *   deal page rather than discarded.
+ * - /settlements computes what is owed to a consignor. Gold Country takes
+ *   consignments regularly, so this is a real liability record; it is moving
+ *   onto the vehicle page.
+ * - /transport is unused as a workflow, but outbound transport survives as an
+ *   expense category marked buyer pass-through.
+ *
+ * Deleting the routes outright would take the calculations with them.
+ */
+export const UNLINKED_ROUTES = [
+  "/approvals",
+  "/listings",
+  "/closing",
+  "/transport",
+  "/consignments",
+  "/settlements",
+  "/integrations",
+] as const;
 
 export function navForUser(user: SessionUser): NavItem[] {
   return NAV_ITEMS.filter((item) => hasPermission(user, item.requires.resource, item.requires.action));

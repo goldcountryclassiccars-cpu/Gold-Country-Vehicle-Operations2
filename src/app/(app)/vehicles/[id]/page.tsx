@@ -80,7 +80,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         </Card>
 
         <Card>
-          <h2 className="mb-4 text-base font-semibold text-stone-900">Identifiers</h2>
+          <h2 className="mb-4 text-base font-semibold text-stone-900">VIN &amp; numbers</h2>
           {vehicle.identifiers.length === 0 ? (
             <p className="text-sm text-stone-500">No identifiers recorded yet.</p>
           ) : (
