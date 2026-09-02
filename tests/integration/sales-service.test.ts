@@ -33,7 +33,7 @@ function sessionUserFor(roleKey: string, base: { id: string; name: string; email
   ]);
   return {
     id: base.id, sessionId: "t", name: base.name, email: base.email, roleKeys: [roleKey],
-    isOwner: roleKey === "owner", previewRoleKey: null, departmentIds: [], departmentKeys: [],
+    isOwner: roleKey === "admin", previewRoleKey: null, departmentIds: [], departmentKeys: [],
     permissions, fieldGrants, defaultLandingPage: null,
   };
 }
@@ -49,8 +49,8 @@ const fileIds: string[] = [];
 beforeAll(async () => {
   const jade = await db.user.findUniqueOrThrow({ where: { email: "jade@demo.gccc" } });
   const fiona = await db.user.findUniqueOrThrow({ where: { email: "finance@demo.gccc" } });
-  owner = sessionUserFor("owner", jade);
-  finance = sessionUserFor("finance", fiona);
+  owner = sessionUserFor("admin", jade);
+  finance = sessionUserFor("front_desk", fiona);
   const vehicle = await db.vehicle.create({ data: { make: "SaleTest", model: "S", year: 1969 } });
   vehicleId = vehicle.id;
   const episode = await db.inventoryEpisode.create({

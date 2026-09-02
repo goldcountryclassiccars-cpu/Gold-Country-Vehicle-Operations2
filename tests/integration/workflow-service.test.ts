@@ -37,7 +37,7 @@ function sessionUserFor(roleKey: string, base: { id: string; name: string; email
     name: base.name,
     email: base.email,
     roleKeys: [roleKey],
-    isOwner: roleKey === "owner",
+    isOwner: roleKey === "admin",
     previewRoleKey: null,
     departmentIds: [],
     departmentKeys: [],
@@ -61,8 +61,8 @@ const cleanup: { inspections: string[]; workOrders: string[]; tasks: string[] } 
 beforeAll(async () => {
   const jade = await db.user.findUniqueOrThrow({ where: { email: "jade@demo.gccc" } });
   const olivia = await db.user.findUniqueOrThrow({ where: { email: "ops@demo.gccc" } });
-  owner = sessionUserFor("owner", jade);
-  ops = sessionUserFor("ops_manager", olivia);
+  owner = sessionUserFor("admin", jade);
+  ops = sessionUserFor("front_desk", olivia);
   deptId = (await db.department.findUniqueOrThrow({ where: { key: "mechanical" } })).id;
   const vehicle = await db.vehicle.create({ data: { make: "WfTest", model: "Wf" } });
   vehicleId = vehicle.id;

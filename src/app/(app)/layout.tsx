@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login?expired=1");
 
   const nav = navForUser(user);
-  const previewableRoles = ROLE_TEMPLATES.filter((r) => r.key !== "owner");
+  const previewableRoles = ROLE_TEMPLATES.filter((r) => r.key !== "admin");
   const unreadCount = await db.notification.count({ where: { userId: user.id, readAt: null } });
 
   const navLinks = (
@@ -93,7 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   defaultValue={user.previewRoleKey ?? "off"}
                   className="w-full rounded-md border border-stone-300 px-2 py-1 text-xs"
                 >
-                  <option value="off">Off (Owner)</option>
+                  <option value="off">Off (Admin)</option>
                   {previewableRoles.map((r) => (
                     <option key={r.key} value={r.key}>
                       {r.name}

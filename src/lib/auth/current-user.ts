@@ -16,13 +16,13 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 
   const realRoles = session.user.roles.map((ur) => ur.role);
   const roleKeys = realRoles.map((r) => r.key);
-  const isOwner = roleKeys.includes("owner");
+  const isOwner = roleKeys.includes("admin");
 
   let effectiveRoles: RoleWithGrants[] = realRoles as unknown as RoleWithGrants[];
   let previewRoleKey: string | null = null;
 
   // "Preview as Role" is owner-only and narrows the effective permission set.
-  if (isOwner && session.previewRoleKey && session.previewRoleKey !== "owner") {
+  if (isOwner && session.previewRoleKey && session.previewRoleKey !== "admin") {
     const previewRole = await db.role.findUnique({
       where: { key: session.previewRoleKey },
       include: { permissions: true, fieldGrants: true },

@@ -18,10 +18,10 @@ import {
 import { createTransportJob, setTransportStatus, TransportError } from "@/modules/transport/service";
 
 function ownerUser(base: { id: string; name: string; email: string }): SessionUser {
-  const tpl = ROLE_TEMPLATES.find((t) => t.key === "owner")!;
+  const tpl = ROLE_TEMPLATES.find((t) => t.key === "admin")!;
   const { permissions, fieldGrants } = buildPermissionMap([
     {
-      key: "owner",
+      key: "admin",
       permissions: Object.entries(tpl.grants).flatMap(([resource, grant]) =>
         Object.entries(grant!).map(([action, scope]) => ({ resource, action, scope })),
       ),
@@ -29,7 +29,7 @@ function ownerUser(base: { id: string; name: string; email: string }): SessionUs
     },
   ]);
   return {
-    id: base.id, sessionId: "t", name: base.name, email: base.email, roleKeys: ["owner"],
+    id: base.id, sessionId: "t", name: base.name, email: base.email, roleKeys: ["admin"],
     isOwner: true, previewRoleKey: null, departmentIds: [], departmentKeys: [],
     permissions, fieldGrants, defaultLandingPage: null,
   };

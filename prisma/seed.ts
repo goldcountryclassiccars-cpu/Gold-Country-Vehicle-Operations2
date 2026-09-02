@@ -30,18 +30,22 @@ const DEMO_USERS: {
   departments: string[];
   active?: boolean;
 }[] = [
-  { email: "jade@demo.gccc", name: "Jade Southworth (Demo)", roles: ["owner"], departments: ["operations"] },
-  { email: "sergio@demo.gccc", name: "Sergio Edell (Demo)", roles: ["owner"], departments: ["sales"] },
-  { email: "ops@demo.gccc", name: "Olivia Operations", roles: ["ops_manager"], departments: ["operations"] },
-  { email: "mechanic@demo.gccc", name: "Mike Mechanic", roles: ["mechanic"], departments: ["mechanical"] },
-  { email: "detailer@demo.gccc", name: "Dana Detailer", roles: ["detailer"], departments: ["detailing"] },
-  { email: "body@demo.gccc", name: "Bella Bodywork", roles: ["body"], departments: ["body"] },
-  { email: "media@demo.gccc", name: "Marco Media", roles: ["media"], departments: ["media"] },
-  { email: "sales@demo.gccc", name: "Sam Salesperson", roles: ["sales"], departments: ["sales"] },
-  { email: "finance@demo.gccc", name: "Fiona Finance", roles: ["finance"], departments: ["finance"] },
-  { email: "transport@demo.gccc", name: "Terry Transport", roles: ["transport"], departments: ["transport"] },
-  { email: "vendor@demo.gccc", name: "Vinny's Upholstery (Vendor)", roles: ["vendor"], departments: [] },
-  { email: "disabled@demo.gccc", name: "Dee Disabled", roles: ["mechanic"], departments: ["mechanical"], active: false },
+  // Demo fixtures only. The real Gold Country accounts are created by an admin
+  // in Administration -> Users, so that nobody's password lives in source
+  // control. These twelve exist to give the sample vehicles a believable cast
+  // and should be disabled before real inventory is entered.
+  { email: "jade@demo.gccc", name: "Jade Southworth (Demo)", roles: ["admin"], departments: ["operations"] },
+  { email: "sergio@demo.gccc", name: "Sergio Edell (Demo)", roles: ["admin"], departments: ["sales"] },
+  { email: "ops@demo.gccc", name: "Olivia Operations", roles: ["front_desk"], departments: ["operations"] },
+  { email: "mechanic@demo.gccc", name: "Mike Mechanic", roles: ["shop"], departments: ["mechanical"] },
+  { email: "detailer@demo.gccc", name: "Dana Detailer", roles: ["shop"], departments: ["detailing"] },
+  { email: "body@demo.gccc", name: "Bella Bodywork", roles: ["shop"], departments: ["body"] },
+  { email: "media@demo.gccc", name: "Marco Media", roles: ["shop"], departments: ["media"] },
+  { email: "sales@demo.gccc", name: "Sam Salesperson", roles: ["front_desk"], departments: ["sales"] },
+  { email: "finance@demo.gccc", name: "Fiona Finance", roles: ["front_desk"], departments: ["finance"] },
+  { email: "transport@demo.gccc", name: "Terry Transport", roles: ["front_desk"], departments: ["transport"] },
+  { email: "vendor@demo.gccc", name: "Vinny's Upholstery (Vendor)", roles: ["shop"], departments: [] },
+  { email: "disabled@demo.gccc", name: "Dee Disabled", roles: ["shop"], departments: ["mechanical"], active: false },
 ];
 
 export async function seedFoundation() {

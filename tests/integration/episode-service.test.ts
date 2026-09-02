@@ -15,10 +15,10 @@ let episodeId: string;
 
 beforeAll(async () => {
   const jade = await db.user.findUniqueOrThrow({ where: { email: "jade@demo.gccc" } });
-  const tpl = ROLE_TEMPLATES.find((t) => t.key === "owner")!;
+  const tpl = ROLE_TEMPLATES.find((t) => t.key === "admin")!;
   const { permissions, fieldGrants } = buildPermissionMap([
     {
-      key: "owner",
+      key: "admin",
       permissions: Object.entries(tpl.grants).flatMap(([resource, grant]) =>
         Object.entries(grant!).map(([action, scope]) => ({ resource, action, scope })),
       ),
@@ -30,7 +30,7 @@ beforeAll(async () => {
     sessionId: "test-session",
     name: jade.name,
     email: jade.email,
-    roleKeys: ["owner"],
+    roleKeys: ["admin"],
     isOwner: true,
     previewRoleKey: null,
     departmentIds: [],

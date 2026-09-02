@@ -1,3 +1,10 @@
+/**
+ * Permission tests for the three-role model (Admin / Front Desk / Shop).
+ *
+ * These assert the boundaries the business actually cares about: the shop floor
+ * never sees money, and the front desk sees customers and paperwork but not what
+ * the dealership paid or made.
+ */
 import { describe, expect, it } from "vitest";
 import {
   authorize,
@@ -32,10 +39,10 @@ function makeUser(roleKeys: string[], opts?: Partial<SessionUser>): SessionUser 
     name: "Test User",
     email: "test@example.com",
     roleKeys,
-    isOwner: roleKeys.includes("owner"),
+    isOwner: roleKeys.includes("admin"),
     previewRoleKey: null,
     departmentIds: [],
-    departmentKeys: ["mechanical"],
+    departmentKeys: [],
     permissions,
     fieldGrants,
     defaultLandingPage: null,
@@ -43,155 +50,155 @@ function makeUser(roleKeys: string[], opts?: Partial<SessionUser>): SessionUser 
   };
 }
 
-describe("owner", () => {
-  const owner = makeUser(["owner"]);
+const MONEY_FIELDS = [
+  "acquisition_cost",
+  "profit",
+  "min_price",
+  "consignor_terms",
+  "commissions",
+  "compensation",
+  "banking",
+] as const;
+
+describe("the role set itself", () => {
+  it("is exactly three roles", () => {
+    expect(ROLE_TEMPLATES.map((r) => r.key).sort()).toEqual(["admin", "front_desk", "shop"]);
+  });
+});
+
+describe("admin", () => {
+  const admin = makeUser(["admin"]);
 
   it("can access every resource/action at ALL scope", () => {
     for (const resource of RESOURCES) {
       for (const action of ACTIONS) {
-        expect(getScope(owner, resource, action)).toBe("ALL");
+        expect(getScope(admin, resource, action)).toBe("ALL");
       }
     }
   });
 
   it("can view every sensitive field", () => {
-    expect(canViewField(owner, "acquisition_cost")).toBe(true);
-    expect(canViewField(owner, "profit")).toBe(true);
-    expect(canViewField(owner, "consignor_terms")).toBe(true);
-    expect(canViewField(owner, "owner_notes")).toBe(true);
+    for (const field of MONEY_FIELDS) expect(canViewField(admin, field)).toBe(true);
+    expect(canViewField(admin, "owner_notes")).toBe(true);
+    expect(canViewField(admin, "buyer_pii")).toBe(true);
   });
 });
 
-describe("mechanic", () => {
-  const mechanic = makeUser(["mechanic"]);
+describe("front desk", () => {
+  const desk = makeUser(["front_desk"]);
 
-  it("cannot view acquisition cost, profit, or consignor terms", () => {
-    expect(canViewField(mechanic, "acquisition_cost")).toBe(false);
-    expect(canViewField(mechanic, "profit")).toBe(false);
-    expect(canViewField(mechanic, "consignor_terms")).toBe(false);
-    expect(canViewField(mechanic, "buyer_pii")).toBe(false);
+  it("sees customers and paperwork", () => {
+    expect(canViewField(desk, "buyer_pii")).toBe(true);
+    expect(canViewField(desk, "seller_pii")).toBe(true);
+    expect(canViewField(desk, "payment_info")).toBe(true);
+    expect(canViewField(desk, "title_docs")).toBe(true);
+    expect(canViewField(desk, "signed_docs")).toBe(true);
   });
 
-  it("has no access to expenses, profitability, sales, documents, admin", () => {
-    expect(getScope(mechanic, "expenses", "view")).toBe("NONE");
-    expect(getScope(mechanic, "profitability", "view")).toBe("NONE");
-    expect(getScope(mechanic, "sales", "view")).toBe("NONE");
-    expect(getScope(mechanic, "documents", "view")).toBe("NONE");
-    expect(getScope(mechanic, "admin", "manage_config")).toBe("NONE");
-    expect(getScope(mechanic, "payments", "view")).toBe("NONE");
+  it("never sees what the dealership paid or made", () => {
+    for (const field of MONEY_FIELDS) {
+      expect(canViewField(desk, field), `front desk must not see ${field}`).toBe(false);
+    }
+    expect(canViewField(desk, "owner_notes")).toBe(false);
   });
 
-  it("sees only assigned vehicles", () => {
-    expect(authorize(mechanic, "view", "vehicles", { assignedUserIds: ["user-1"] })).toBe(true);
-    expect(authorize(mechanic, "view", "vehicles", { assignedUserIds: ["someone-else"] })).toBe(false);
-    expect(authorize(mechanic, "view", "vehicles")).toBe(true); // list access; reads must be scope-filtered
+  it("has no profitability, reports, or configuration access", () => {
+    expect(getScope(desk, "profitability", "view")).toBe("NONE");
+    expect(getScope(desk, "reports", "view")).toBe("NONE");
+    expect(getScope(desk, "admin", "manage_config")).toBe("NONE");
+    expect(getScope(desk, "audit", "view")).toBe("NONE");
   });
 
-  it("sees department work orders and assigned ones", () => {
-    expect(
-      authorize(mechanic, "view", "work_orders", { departmentKeys: ["mechanical"] }),
-    ).toBe(true);
-    expect(authorize(mechanic, "view", "work_orders", { departmentKeys: ["body"] })).toBe(false);
-    expect(
-      authorize(mechanic, "view", "work_orders", { departmentKeys: ["body"], assignedUserIds: ["user-1"] }),
-    ).toBe(true);
+  it("can run a deal end to end", () => {
+    expect(getScope(desk, "sales", "create")).toBe("ALL");
+    expect(getScope(desk, "payments", "create")).toBe("ALL");
+    expect(getScope(desk, "documents", "generate")).toBe("ALL");
+    expect(getScope(desk, "parties", "create")).toBe("ALL");
   });
 
-  it("requirePermission throws for finance resources", () => {
-    expect(() => requirePermission(mechanic, "view", "payments")).toThrow(AuthzError);
+  it("cannot override the release gate", () => {
+    expect(getScope(desk, "sales", "override_gate")).toBe("NONE");
+    expect(() => requireOwnerOverride(desk, "buyer says the wire is sent")).toThrow(AuthzError);
   });
 });
 
-describe("detailer", () => {
-  const detailer = makeUser(["detailer"], { departmentKeys: ["detailing"] });
+describe("shop", () => {
+  const shop = makeUser(["shop"]);
 
-  it("cannot access buyer records (parties) or sales", () => {
-    expect(getScope(detailer, "parties", "view")).toBe("NONE");
-    expect(getScope(detailer, "sales", "view")).toBe("NONE");
-    expect(canViewField(detailer, "buyer_pii")).toBe(false);
-  });
-});
-
-describe("media user", () => {
-  const media = makeUser(["media"], { departmentKeys: ["media"] });
-
-  it("cannot view consignor financial terms or costs", () => {
-    expect(canViewField(media, "consignor_terms")).toBe(false);
-    expect(canViewField(media, "acquisition_cost")).toBe(false);
-    expect(canViewField(media, "min_price")).toBe(false);
+  it("sees no money of any kind", () => {
+    for (const field of MONEY_FIELDS) {
+      expect(canViewField(shop, field), `shop must not see ${field}`).toBe(false);
+    }
+    expect(canViewField(shop, "buyer_pii")).toBe(false);
+    expect(canViewField(shop, "seller_pii")).toBe(false);
   });
 
-  it("can view vehicles and manage media", () => {
-    expect(getScope(media, "vehicles", "view")).toBe("ALL");
-    expect(getScope(media, "media", "edit")).toBe("ALL");
-  });
-});
-
-describe("salesperson", () => {
-  const sales = makeUser(["sales"], { departmentKeys: ["sales"] });
-
-  it("cannot view profit or acquisition cost without an explicit grant", () => {
-    expect(canViewField(sales, "profit")).toBe(false);
-    expect(canViewField(sales, "acquisition_cost")).toBe(false);
-    expect(canViewField(sales, "consignor_terms")).toBe(false);
-    expect(canViewField(sales, "min_price")).toBe(false);
+  it("has no access to expenses, deals, payments, documents or admin", () => {
+    expect(getScope(shop, "expenses", "view")).toBe("NONE");
+    expect(getScope(shop, "profitability", "view")).toBe("NONE");
+    expect(getScope(shop, "sales", "view")).toBe("NONE");
+    expect(getScope(shop, "payments", "view")).toBe("NONE");
+    expect(getScope(shop, "documents", "view")).toBe("NONE");
+    expect(getScope(shop, "admin", "manage_config")).toBe("NONE");
   });
 
-  it("sees own deals only", () => {
-    expect(authorize(sales, "view", "sales", { assignedUserIds: ["user-1"] })).toBe(true);
-    expect(authorize(sales, "view", "sales", { assignedUserIds: ["other"] })).toBe(false);
-  });
-});
-
-describe("external vendor", () => {
-  const vendor = makeUser(["vendor"], { departmentKeys: [] });
-
-  it("can only access explicitly assigned work orders", () => {
-    expect(getScope(vendor, "work_orders", "view")).toBe("ASSIGNED");
-    expect(authorize(vendor, "view", "work_orders", { assignedUserIds: ["user-1"] })).toBe(true);
-    expect(authorize(vendor, "view", "work_orders", { assignedUserIds: [] })).toBe(false);
+  it("sees ALL work, not just its own — the iPad is a shared login", () => {
+    // If this were ASSIGNED, the shared shop iPad would show an empty task list,
+    // because the account signed in is nobody's individual account.
+    expect(getScope(shop, "tasks", "view")).toBe("ALL");
+    expect(getScope(shop, "work_orders", "view")).toBe("ALL");
+    expect(getScope(shop, "inspections", "view")).toBe("ALL");
+    expect(authorize(shop, "view", "tasks", { assignedUserIds: ["someone-else"] })).toBe(true);
   });
 
-  it("has no access to sales, expenses, listings, reports", () => {
-    expect(getScope(vendor, "sales", "view")).toBe("NONE");
-    expect(getScope(vendor, "expenses", "view")).toBe("NONE");
-    expect(getScope(vendor, "listings", "view")).toBe("NONE");
-    expect(getScope(vendor, "reports", "view")).toBe("NONE");
+  it("can create and finish its own work", () => {
+    expect(getScope(shop, "tasks", "create")).toBe("ALL");
+    expect(getScope(shop, "tasks", "complete")).toBe("ALL");
+    expect(getScope(shop, "work_orders", "complete")).toBe("ALL");
+    expect(getScope(shop, "media", "create")).toBe("ALL");
+  });
+
+  it("requirePermission throws for money resources", () => {
+    expect(() => requirePermission(shop, "view", "payments")).toThrow(AuthzError);
+    expect(() => requirePermission(shop, "view", "profitability")).toThrow(AuthzError);
   });
 });
 
 describe("multiple roles union", () => {
-  const dual = makeUser(["mechanic", "sales"], { departmentKeys: ["mechanical", "sales"] });
+  const dual = makeUser(["front_desk", "shop"]);
 
   it("receives the strongest scope from each role", () => {
-    // mechanic gives vehicles:view ASSIGNED; sales gives ALL — union is ALL
-    expect(getScope(dual, "vehicles", "view")).toBe("ALL");
-    // mechanic-only permissions survive
-    expect(getScope(dual, "inspections", "view")).toBe("DEPARTMENT");
-    // sales-only permissions survive
-    expect(getScope(dual, "sales", "view")).toBe("ASSIGNED");
+    expect(getScope(dual, "sales", "view")).toBe("ALL"); // front desk only
+    expect(getScope(dual, "inspections", "create")).toBe("ALL"); // shop only
   });
 
-  it("unions field grants", () => {
-    expect(canViewField(dual, "buyer_pii")).toBe(true); // from sales
-    expect(canViewField(dual, "profit")).toBe(false); // neither role grants profit
+  it("unions field grants without inventing new ones", () => {
+    expect(canViewField(dual, "buyer_pii")).toBe(true); // from front desk
+    expect(canViewField(dual, "profit")).toBe(false); // neither role grants it
+    expect(canViewField(dual, "acquisition_cost")).toBe(false);
   });
 });
 
-describe("owner override", () => {
-  it("requires the real owner role and a reason", () => {
-    const owner = makeUser(["owner"]);
-    const mechanic = makeUser(["mechanic"]);
-    expect(() => requireOwnerOverride(owner, "Funds wired, confirmation attached")).not.toThrow();
-    expect(() => requireOwnerOverride(owner, "")).toThrow(AuthzError);
-    expect(() => requireOwnerOverride(owner, "ok")).toThrow(AuthzError);
-    expect(() => requireOwnerOverride(mechanic, "some reason here")).toThrow(AuthzError);
+describe("admin override", () => {
+  it("requires a real admin and a substantive reason", () => {
+    const admin = makeUser(["admin"]);
+    const shop = makeUser(["shop"]);
+    expect(() => requireOwnerOverride(admin, "Funds wired, confirmation attached")).not.toThrow();
+    expect(() => requireOwnerOverride(admin, "")).toThrow(AuthzError);
+    expect(() => requireOwnerOverride(admin, "ok")).toThrow(AuthzError);
+    expect(() => requireOwnerOverride(shop, "some reason here")).toThrow(AuthzError);
+  });
+
+  it("is not granted by preview mode", () => {
+    const previewing = makeUser(["admin"], { isOwner: false, previewRoleKey: "shop" });
+    expect(() => requireOwnerOverride(previewing, "a perfectly good reason")).toThrow(AuthzError);
   });
 });
 
 describe("stripFields", () => {
-  const mechanic = makeUser(["mechanic"]);
-  const owner = makeUser(["owner"]);
+  const shop = makeUser(["shop"]);
+  const desk = makeUser(["front_desk"]);
+  const admin = makeUser(["admin"]);
   const record = {
     id: "e1",
     stockNumber: "GC-1001",
@@ -204,16 +211,23 @@ describe("stripFields", () => {
     profit: ["forecastProfit"],
   };
 
-  it("removes protected columns for unauthorized users", () => {
-    const sanitized = stripFields(mechanic, record, map);
+  it("removes protected columns for the shop", () => {
+    const sanitized = stripFields(shop, record, map);
     expect(sanitized.purchasePrice).toBeUndefined();
     expect(sanitized.forecastProfit).toBeUndefined();
     expect(sanitized.stockNumber).toBe("GC-1001");
     expect(sanitized.askingPrice).toBe(59900);
   });
 
-  it("keeps everything for owners", () => {
-    const sanitized = stripFields(owner, record, map);
+  it("removes them for the front desk too", () => {
+    const sanitized = stripFields(desk, record, map);
+    expect(sanitized.purchasePrice).toBeUndefined();
+    expect(sanitized.forecastProfit).toBeUndefined();
+    expect(sanitized.askingPrice).toBe(59900);
+  });
+
+  it("keeps everything for admins", () => {
+    const sanitized = stripFields(admin, record, map);
     expect(sanitized.purchasePrice).toBe(42000);
     expect(sanitized.forecastProfit).toBe(9000);
   });

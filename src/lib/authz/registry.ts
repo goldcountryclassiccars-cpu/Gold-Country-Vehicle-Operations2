@@ -77,18 +77,12 @@ export const SENSITIVE_FIELDS = [
 ] as const;
 export type SensitiveField = (typeof SENSITIVE_FIELDS)[number];
 
-export const ROLE_KEYS = [
-  "owner",
-  "ops_manager",
-  "mechanic",
-  "detailer",
-  "body",
-  "media",
-  "sales",
-  "finance",
-  "transport",
-  "vendor",
-] as const;
+/**
+ * Three roles, chosen 2026-09 to match how the dealership actually works:
+ * Jade and Sergio run everything, Rose runs the front desk, and the shop floor
+ * shares an iPad. Ten roles described a larger company than this one.
+ */
+export const ROLE_KEYS = ["admin", "front_desk", "shop"] as const;
 export type RoleKey = (typeof ROLE_KEYS)[number];
 
 type Grant = Partial<Record<Action, Scope>>;
@@ -105,187 +99,66 @@ const fullAccess: Grant = Object.fromEntries(ACTIONS.map((a) => [a, "ALL"])) as 
 /** Default role templates. Owners are locked to full access; others are editable. */
 export const ROLE_TEMPLATES: RoleTemplate[] = [
   {
-    key: "owner",
-    name: "Owner / Administrator",
-    description: "Full access to every module, record, field, approval, and configuration.",
+    key: "admin",
+    name: "Admin",
+    description:
+      "Full access to every module, record, field and configuration. Jade and Sergio.",
     grants: Object.fromEntries(RESOURCES.map((r) => [r, fullAccess])) as RoleTemplate["grants"],
     fieldGrants: [...SENSITIVE_FIELDS],
   },
   {
-    key: "ops_manager",
-    name: "Operations Manager",
+    key: "front_desk",
+    name: "Front Desk",
     description:
-      "Vehicle workflow, intake, custody, assignments, tasks, inspections, work orders, media readiness, operational reports.",
+      "Deals, buyers, payments, paperwork and the vehicle record. Sees customer information but not what the dealership paid or made.",
     grants: {
       vehicles: { view: "ALL", create: "ALL", edit: "ALL" },
       episodes: { view: "ALL", create: "ALL", edit: "ALL" },
       intake: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL" },
-      locations: { view: "ALL", create: "ALL", edit: "ALL" },
+      locations: { view: "ALL" },
       parties: { view: "ALL", create: "ALL", edit: "ALL" },
       tasks: { view: "ALL", create: "ALL", edit: "ALL", assign: "ALL", complete: "ALL", reopen: "ALL" },
       comments: { view: "ALL", create: "ALL" },
-      inspections: { view: "ALL", create: "ALL", edit: "ALL", assign: "ALL", complete: "ALL" },
-      work_orders: { view: "ALL", create: "ALL", edit: "ALL", assign: "ALL", complete: "ALL" },
-      approvals: { view: "ALL", create: "ALL", approve: "ALL" }, // amount thresholds enforced separately
+      inspections: { view: "ALL" },
+      work_orders: { view: "ALL" },
       expenses: { view: "ALL", create: "ALL", edit: "ALL" },
-      media: { view: "ALL", create: "ALL", edit: "ALL", assign: "ALL" },
-      listings: { view: "ALL" },
-      transport: { view: "ALL", create: "ALL", edit: "ALL" },
-      reports: { view: "DEPARTMENT" },
-      archive: { view: "ALL" },
-      notifications: { view: "OWN" },
-    },
-    fieldGrants: ["seller_pii"], // needed for intake/custody coordination
-  },
-  {
-    key: "mechanic",
-    name: "Mechanic",
-    description: "Assigned mechanical work: inspections, issues, work orders, parts and labor.",
-    grants: {
-      vehicles: { view: "ASSIGNED" },
-      episodes: { view: "ASSIGNED" },
-      tasks: { view: "ASSIGNED", edit: "ASSIGNED", complete: "ASSIGNED" },
-      comments: { view: "ASSIGNED", create: "ASSIGNED" },
-      inspections: { view: "DEPARTMENT", create: "DEPARTMENT", edit: "ASSIGNED", complete: "ASSIGNED" },
-      work_orders: { view: "DEPARTMENT", edit: "ASSIGNED", complete: "ASSIGNED" },
-      approvals: { view: "OWN", create: "ASSIGNED" },
-      media: { view: "ASSIGNED", create: "ASSIGNED" }, // mechanical photos
-      notifications: { view: "OWN" },
-    },
-    fieldGrants: [],
-  },
-  {
-    key: "detailer",
-    name: "Detailer",
-    description: "Assigned detailing work, checklists, condition notes, before/after photos.",
-    grants: {
-      vehicles: { view: "ASSIGNED" },
-      episodes: { view: "ASSIGNED" },
-      tasks: { view: "ASSIGNED", edit: "ASSIGNED", complete: "ASSIGNED" },
-      comments: { view: "ASSIGNED", create: "ASSIGNED" },
-      work_orders: { view: "DEPARTMENT", edit: "ASSIGNED", complete: "ASSIGNED" },
-      media: { view: "ASSIGNED", create: "ASSIGNED" },
-      notifications: { view: "OWN" },
-    },
-    fieldGrants: [],
-  },
-  {
-    key: "body",
-    name: "Body & Paint Technician",
-    description: "Assigned body/paint issues, estimates, work orders, before/after photos.",
-    grants: {
-      vehicles: { view: "ASSIGNED" },
-      episodes: { view: "ASSIGNED" },
-      tasks: { view: "ASSIGNED", edit: "ASSIGNED", complete: "ASSIGNED" },
-      comments: { view: "ASSIGNED", create: "ASSIGNED" },
-      inspections: { view: "DEPARTMENT", create: "DEPARTMENT", edit: "ASSIGNED", complete: "ASSIGNED" },
-      work_orders: { view: "DEPARTMENT", edit: "ASSIGNED", complete: "ASSIGNED" },
-      approvals: { view: "OWN", create: "ASSIGNED" },
-      media: { view: "ASSIGNED", create: "ASSIGNED" },
-      notifications: { view: "OWN" },
-    },
-    fieldGrants: [],
-  },
-  {
-    key: "media",
-    name: "Media / Marketing",
-    description: "Media queue, checklists, uploads, listing readiness, listing handoffs.",
-    grants: {
-      vehicles: { view: "ALL" }, // approved specs only (field-filtered)
-      episodes: { view: "ALL" },
-      tasks: { view: "ASSIGNED", edit: "ASSIGNED", complete: "ASSIGNED" },
-      comments: { view: "ASSIGNED", create: "ASSIGNED" },
-      media: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL" },
-      listings: { view: "ALL", generate: "ALL" },
-      notifications: { view: "OWN" },
-    },
-    fieldGrants: [],
-  },
-  {
-    key: "sales",
-    name: "Salesperson",
-    description: "Available inventory, own deals, holds and deposits, buyers, closing tasks, transport status.",
-    grants: {
-      vehicles: { view: "ALL" },
-      episodes: { view: "ALL" },
-      tasks: { view: "ASSIGNED", edit: "ASSIGNED", complete: "ASSIGNED" },
-      comments: { view: "ASSIGNED", create: "ASSIGNED" },
-      media: { view: "ALL" },
-      listings: { view: "ALL" },
-      sales: { view: "ASSIGNED", create: "ALL", edit: "ASSIGNED" },
-      parties: { view: "ASSIGNED", create: "ALL", edit: "ASSIGNED" }, // buyers on own deals
-      payments: { view: "ASSIGNED" },
-      documents: { view: "ASSIGNED" },
-      transport: { view: "ASSIGNED" },
-      notifications: { view: "OWN" },
-    },
-    // Buyer PII on own deals is scoped by record access; profit/cost require explicit grants.
-    fieldGrants: ["buyer_pii"],
-  },
-  {
-    key: "finance",
-    name: "Finance / Title / Deal Administration",
-    description: "Closing desk, payments, documents, titles, consignor settlements, reconciliation.",
-    grants: {
-      vehicles: { view: "ALL" },
-      episodes: { view: "ALL" },
-      tasks: { view: "ASSIGNED", edit: "ASSIGNED", complete: "ASSIGNED" },
-      comments: { view: "ASSIGNED", create: "ASSIGNED" },
-      sales: { view: "ALL", edit: "ALL" },
-      parties: { view: "ALL", create: "ALL", edit: "ALL" },
+      media: { view: "ALL", create: "ALL", edit: "ALL" },
+      sales: { view: "ALL", create: "ALL", edit: "ALL" },
       payments: { view: "ALL", create: "ALL", edit: "ALL" },
       documents: { view: "ALL", create: "ALL", edit: "ALL", generate: "ALL", send: "ALL" },
-      transport: { view: "ALL" },
       consignments: { view: "ALL" },
       settlements: { view: "ALL", create: "ALL", edit: "ALL" },
-      expenses: { view: "ALL", create: "ALL", edit: "ALL" },
-      reports: { view: "DEPARTMENT" },
       archive: { view: "ALL" },
       notifications: { view: "OWN" },
     },
-    fieldGrants: [
-      "buyer_pii",
-      "seller_pii",
-      "payment_info",
-      "title_docs",
-      "id_docs",
-      "signed_docs",
-      "consignor_terms",
-      "accounting_refs",
-    ],
+    // Customer-facing work needs buyer and seller details and the paperwork that
+    // goes with them. Acquisition cost, profit, minimum price and consignor
+    // terms are deliberately absent — those stay with Admin.
+    fieldGrants: ["buyer_pii", "seller_pii", "payment_info", "title_docs", "id_docs", "signed_docs"],
   },
   {
-    key: "transport",
-    name: "Transport Coordinator",
-    description: "Transport queue, quotes, pickups, deliveries, carrier documents.",
+    key: "shop",
+    name: "Shop",
+    description:
+      "Vehicles, tasks, inspections, work orders and photos. Shared on the shop iPad, so it sees all shop work rather than one person's.",
     grants: {
-      vehicles: { view: "ASSIGNED" },
-      episodes: { view: "ASSIGNED" },
-      tasks: { view: "ASSIGNED", edit: "ASSIGNED", complete: "ASSIGNED" },
-      comments: { view: "ASSIGNED", create: "ASSIGNED" },
-      transport: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL" },
-      parties: { view: "ASSIGNED" }, // buyer contact needed for delivery
-      notifications: { view: "OWN" },
-    },
-    fieldGrants: ["buyer_pii"], // delivery contact info only; enforced by sanitizer
-  },
-  {
-    key: "vendor",
-    name: "External Vendor",
-    description: "Only work orders explicitly assigned to this vendor.",
-    grants: {
-      vehicles: { view: "ASSIGNED" },
-      tasks: { view: "ASSIGNED", edit: "ASSIGNED", complete: "ASSIGNED" },
-      comments: { view: "ASSIGNED", create: "ASSIGNED" }, // vendor-visible comments only
-      work_orders: { view: "ASSIGNED", edit: "ASSIGNED", complete: "ASSIGNED" },
-      media: { view: "ASSIGNED", create: "ASSIGNED" },
+      vehicles: { view: "ALL" },
+      episodes: { view: "ALL" },
+      locations: { view: "ALL" },
+      // "ALL" rather than "ASSIGNED" is deliberate: the iPad is signed in once
+      // as a shared account, so it must show everyone's work for people to find
+      // their own name on the list.
+      tasks: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL", reopen: "ALL" },
+      comments: { view: "ALL", create: "ALL" },
+      inspections: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL" },
+      work_orders: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL" },
+      media: { view: "ALL", create: "ALL" },
       notifications: { view: "OWN" },
     },
     fieldGrants: [],
   },
 ];
 
-/** Scope strength ordering for unioning multiple roles: larger wins. */
 export const SCOPE_RANK: Record<Scope, number> = {
   NONE: 0,
   OWN: 1,
