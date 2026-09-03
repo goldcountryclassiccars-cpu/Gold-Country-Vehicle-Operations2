@@ -36,7 +36,7 @@ export default async function DocumentsPage() {
     <div className="mx-auto max-w-4xl">
       <PageHeader title="Documents" subtitle="Generated sales documents, their versions and signature status." />
 
-      <Card className="mb-6">
+      <Card className="mb-6" accent="slate">
         <p className="text-sm text-amber-900">
           All documents are <strong>demonstration templates</strong> — watermarked and not legally sufficient. The
           owner setup checklist in <code className="rounded bg-stone-100 px-1">SALES_DOCUMENT_SETUP.md</code> lists what the

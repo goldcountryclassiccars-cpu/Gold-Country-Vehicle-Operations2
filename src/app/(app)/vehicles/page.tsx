@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/auth/current-user";
 import { hasPermission, requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
 import { vehicleWhereForUser, vehicleLabel } from "@/modules/vehicles/service";
-import { displayStage } from "@/modules/episodes/stage";
+import { displayStage, STAGE_TONE } from "@/modules/episodes/stage";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Vehicles" };
@@ -114,7 +114,7 @@ export default async function VehiclesPage({
                     <td className="px-4 py-3 text-stone-600">
                       {ep ? (ep.dealType === "CONSIGNMENT" ? "Consignment" : ep.dealType === "DEALER_PURCHASE" ? "Dealer-owned" : ep.dealType) : "—"}
                     </td>
-                    <td className="px-4 py-3">{ep ? <Badge tone="brand">{displayStage(ep)}</Badge> : "—"}</td>
+                    <td className="px-4 py-3">{ep ? <Badge tone={STAGE_TONE[displayStage(ep)]}>{displayStage(ep)}</Badge> : "—"}</td>
                     <td className="px-4 py-3 text-stone-700">
                       {ep?.askingPrice ? `$${Number(ep.askingPrice).toLocaleString()}` : "—"}
                     </td>

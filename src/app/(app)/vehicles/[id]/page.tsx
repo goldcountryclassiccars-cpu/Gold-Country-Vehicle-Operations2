@@ -6,7 +6,7 @@ import { authorize, hasPermission, requirePermission } from "@/lib/authz/engine"
 import { db } from "@/lib/db";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { addIdentifierAction } from "@/modules/vehicles/actions";
-import { displayStage } from "@/modules/episodes/stage";
+import { displayStage, STAGE_TONE } from "@/modules/episodes/stage";
 import { Badge, Card, DescriptionList, EmptyState, PageHeader, inputClass } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Vehicle" };
@@ -146,7 +146,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
                 </div>
                 <div className="flex items-center gap-3">
                   {e.askingPrice ? <span className="text-sm text-stone-700">${Number(e.askingPrice).toLocaleString()}</span> : null}
-                  <Badge tone={e.active ? "brand" : "neutral"}>{displayStage(e)}</Badge>
+                  <Badge tone={e.active ? STAGE_TONE[displayStage(e)] : "neutral"}>{displayStage(e)}</Badge>
                 </div>
               </Link>
             ))}

@@ -75,7 +75,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
       />
 
       {canCreate ? (
-        <Card className="mb-6">
+        <Card className="mb-6" accent="rose">
           <h2 className="mb-3 text-sm font-semibold text-stone-900">New expense</h2>
           <form action={createExpenseAction} className="grid gap-2 sm:grid-cols-6">
             <div className="sm:col-span-2">

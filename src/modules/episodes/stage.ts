@@ -1,4 +1,5 @@
 import type { InventoryEpisode } from "@prisma/client";
+import type { BadgeTone } from "@/components/ui";
 
 /**
  * Simplified display stage for dashboards/pipeline. COMPUTED from the six
@@ -80,3 +81,23 @@ export function displayStage(e: StageInput): DisplayStage {
   if (e.reconditioningStatus === "NOT_ASSESSED") return "Intake";
   return "Media";
 }
+
+/**
+ * A color per stage so the pipeline and vehicle lists are scannable at a
+ * glance instead of every stage rendering as the same neutral badge. Colors
+ * run roughly cool-to-warm as a vehicle nears a sale, then land on green at
+ * financial close.
+ */
+export const STAGE_TONE: Record<DisplayStage, BadgeTone> = {
+  Expected: "slate",
+  Intake: "cyan",
+  Reconditioning: "orange",
+  Media: "violet",
+  "Ready to List": "indigo",
+  Listed: "blue",
+  "Deal in Progress": "amber",
+  Closing: "brand",
+  "Delivered / Settling": "teal",
+  Closed: "green",
+  Inactive: "neutral",
+};

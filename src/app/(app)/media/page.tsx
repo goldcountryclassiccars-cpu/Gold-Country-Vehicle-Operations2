@@ -67,7 +67,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
             <EmptyState title="Select a vehicle" hint="Choose a vehicle to see its checklist and assets." />
           ) : (
             <div className="space-y-6">
-              <Card>
+              <Card accent="indigo">
                 <h2 className="mb-3 text-base font-semibold text-stone-900">
                   {selected.stockNumber} — checklist
                 </h2>

@@ -106,7 +106,7 @@ export default async function ProfitabilityPage() {
         </div>
       )}
 
-      <Card className="mt-6">
+      <Card className="mt-6" accent="green">
         <h2 className="text-sm font-semibold text-stone-900">How these numbers work</h2>
         <p className="mt-1 text-sm text-stone-600">
           Every figure is computed from the expense ledger and the confidential arrangement — never stored as a running

@@ -56,7 +56,7 @@ export default async function SalesPage() {
       <PageHeader title="Deals in Progress" subtitle="Deals from first deposit through delivery. Canceled deals stay on record." />
 
       {availableEpisodes.length > 0 ? (
-        <Card className="mb-6">
+        <Card className="mb-6" accent="fuchsia">
           <h2 className="mb-3 text-sm font-semibold text-stone-900">New deal</h2>
           <form action={createSaleAction} className="grid gap-2 sm:grid-cols-6">
             <div className="sm:col-span-2">

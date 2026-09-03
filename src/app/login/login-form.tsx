@@ -7,7 +7,7 @@ export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState<LoginState, FormData>(loginAction, {});
 
   return (
-    <form action={formAction} className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-xl border border-stone-200 bg-white p-6 shadow-lg shadow-stone-200/50">
       {state.error ? (
         <div
           role="alert"
@@ -28,7 +28,7 @@ export function LoginForm({ next }: { next?: string }) {
             type="email"
             autoComplete="email"
             required
-            className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm"
+            className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
         <div>
@@ -41,13 +41,13 @@ export function LoginForm({ next }: { next?: string }) {
             type="password"
             autoComplete="current-password"
             required
-            className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm"
+            className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
+          className="min-h-11 w-full rounded-md bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:opacity-60"
         >
           {pending ? "Signing in…" : "Sign in"}
         </button>

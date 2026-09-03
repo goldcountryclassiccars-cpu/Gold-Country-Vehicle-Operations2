@@ -46,7 +46,7 @@ export default async function AdminPage() {
       />
 
       <div className="space-y-6">
-        <Card>
+        <Card accent="stone">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Users</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">

@@ -6,7 +6,7 @@ import { authorize, canViewField, hasPermission, requirePermission } from "@/lib
 import { db } from "@/lib/db";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { sanitizeArrangementForUser } from "@/modules/vehicles/sanitize";
-import { displayStage } from "@/modules/episodes/stage";
+import { displayStage, STAGE_TONE } from "@/modules/episodes/stage";
 import { STATUS_DIMENSIONS, type StatusDimension } from "@/modules/episodes/service";
 import { changeStatusAction, setPriceAction, updateArrangementAction } from "@/modules/episodes/actions";
 import { Badge, Card, DescriptionList, PageHeader, inputClass } from "@/components/ui";
@@ -60,7 +60,8 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title={`${episode.stockNumber} — ${vehicleLabel(episode.vehicle)}`}
-        subtitle={`${episode.dealType === "CONSIGNMENT" ? "Consignment" : episode.dealType === "DEALER_PURCHASE" ? "Dealer-owned" : episode.dealType} · Stage: ${displayStage(episode)}`}
+        subtitle={episode.dealType === "CONSIGNMENT" ? "Consignment" : episode.dealType === "DEALER_PURCHASE" ? "Dealer-owned" : episode.dealType}
+        badge={<Badge tone={STAGE_TONE[displayStage(episode)]}>{displayStage(episode)}</Badge>}
         actions={
           <div className="flex gap-2">
             <Link href={`/vehicles/${episode.vehicleId}`} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm hover:bg-stone-50">

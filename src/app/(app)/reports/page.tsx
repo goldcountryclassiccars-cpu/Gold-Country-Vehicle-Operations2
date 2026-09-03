@@ -72,26 +72,26 @@ export default async function ReportsPage() {
       <PageHeader title="Reports" subtitle="Live operational and financial reporting — computed, never cached totals." />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Card>
+        <Card accent="blue">
           <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Active inventory</p>
           <p className="mt-1 text-3xl font-semibold text-stone-900">{active.length}</p>
           <p className="mt-1 text-xs text-stone-500">
             {[...stageCounts.entries()].map(([s, c]) => `${c} ${s.toLowerCase()}`).join(" · ") || "—"}
           </p>
         </Card>
-        <Card>
+        <Card accent="brand">
           <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Pipeline value (asking)</p>
           <p className="mt-1 text-3xl font-semibold text-stone-900">{money(pipelineValue)}</p>
           <p className="mt-1 text-xs text-stone-500">Average age {avgAge} days</p>
         </Card>
         {showProfit ? (
-          <Card>
+          <Card accent={totalNet < 0 ? "rose" : "green"}>
             <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Net profit (all episodes)</p>
             <p className={`mt-1 text-3xl font-semibold ${totalNet < 0 ? "text-red-700" : "text-stone-900"}`}>{money(totalNet)}</p>
             <p className="mt-1 text-xs text-stone-500">Projected + realized, from the ledger</p>
           </Card>
         ) : (
-          <Card>
+          <Card accent="stone">
             <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Vehicles handled</p>
             <p className="mt-1 text-3xl font-semibold text-stone-900">{allEpisodes.length}</p>
             <p className="mt-1 text-xs text-stone-500">All time</p>
@@ -99,7 +99,7 @@ export default async function ReportsPage() {
         )}
       </div>
 
-      <Card className="mb-6">
+      <Card className="mb-6" accent="cyan">
         <h2 className="text-base font-semibold text-stone-900">Acquisition source performance</h2>
         <p className="mt-0.5 text-xs text-stone-500">
           {showProfit ? "Net profit contribution by source (bar length), with vehicle counts." : "Vehicles by acquisition source."}

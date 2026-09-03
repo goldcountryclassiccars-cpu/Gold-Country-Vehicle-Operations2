@@ -38,7 +38,7 @@ export default async function InspectionsPage() {
       <PageHeader title="Inspections" subtitle="Condition assessments feeding estimates, approvals, and work orders." />
 
       {canCreate ? (
-        <Card className="mb-6">
+        <Card className="mb-6" accent="teal">
           <h2 className="mb-3 text-sm font-semibold text-stone-900">Schedule inspection</h2>
           <form action={createInspectionAction} className="grid gap-2 sm:grid-cols-4">
             <div>

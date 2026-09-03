@@ -55,7 +55,7 @@ export default async function MyWorkPage() {
       <PageHeader title="My Work" subtitle="Open tasks, inspections, and work orders relevant to you." />
 
       <div className="space-y-6">
-        <Card>
+        <Card accent="amber">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Tasks</h2>
           {tasks.length === 0 ? (
             <p className="text-sm text-stone-500">No open tasks.</p>
