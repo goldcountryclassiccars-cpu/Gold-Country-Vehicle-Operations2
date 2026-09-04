@@ -52,6 +52,13 @@ export interface CreateEpisodeInput {
   dealType: DealType;
   acquisitionSourceId?: string | null;
   expectedArrivalAt?: Date | null;
+  /**
+   * When the car actually came into inventory. Defaults to now for a car
+   * being entered as it arrives; supplied explicitly when back-filling
+   * existing inventory, so days-in-inventory and the 90+ day aging report
+   * are true from the first day rather than restarting everyone's clock.
+   */
+  acceptedAt?: Date | null;
   askingPrice?: number | null;
   salespersonId?: string | null;
   operationsOwnerId?: string | null;
@@ -71,7 +78,7 @@ export async function createEpisode(user: SessionUser, input: CreateEpisodeInput
       stockNumber,
       dealType: input.dealType,
       acquisitionSourceId: input.acquisitionSourceId ?? null,
-      acceptedAt: new Date(),
+      acceptedAt: input.acceptedAt ?? new Date(),
       expectedArrivalAt: input.expectedArrivalAt ?? null,
       askingPrice: input.askingPrice ?? null,
       salespersonId: input.salespersonId ?? null,

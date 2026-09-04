@@ -39,9 +39,17 @@ export default async function AdminPage() {
         title="Administration"
         subtitle="Users, roles, and dealership configuration. Every change here is audited."
         actions={
-          <Link href="/admin/audit" className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm hover:bg-stone-50">
-            Audit log
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin/import"
+              className="min-h-11 rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-800"
+            >
+              Import inventory
+            </Link>
+            <Link href="/admin/audit" className="min-h-11 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm hover:bg-stone-50">
+              Audit log
+            </Link>
+          </div>
         }
       />
 
