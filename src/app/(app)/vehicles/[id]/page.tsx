@@ -6,6 +6,7 @@ import { authorize, hasPermission, requirePermission } from "@/lib/authz/engine"
 import { db } from "@/lib/db";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { addIdentifierAction } from "@/modules/vehicles/actions";
+import { EditVehicleForm } from "./edit-vehicle-form";
 import { displayStage, STAGE_TONE } from "@/modules/episodes/stage";
 import { Badge, Card, DescriptionList, EmptyState, PageHeader, inputClass } from "@/components/ui";
 
@@ -123,6 +124,29 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           ) : null}
         </Card>
       </div>
+
+      {canEdit ? (
+        <div className="mt-6">
+          <EditVehicleForm
+            vehicle={{
+              id: vehicle.id,
+              year: vehicle.year,
+              make: vehicle.make,
+              model: vehicle.model,
+              trim: vehicle.trim,
+              bodyStyle: vehicle.bodyStyle,
+              exteriorColor: vehicle.exteriorColor,
+              interiorColor: vehicle.interiorColor,
+              engineDescription: vehicle.engineDescription,
+              transmission: vehicle.transmission,
+              drivetrain: vehicle.drivetrain,
+              mileage: vehicle.mileage,
+              mileageStatus: vehicle.mileageStatus,
+              generalDescription: vehicle.generalDescription,
+            }}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-6">
         <h2 className="mb-3 text-base font-semibold text-stone-900">Inventory episodes</h2>

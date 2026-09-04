@@ -6,7 +6,7 @@ import { z } from "zod";
 import { IdentifierType, MileageStatus, DealType } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth/current-user";
 import { requirePermission, canViewField } from "@/lib/authz/engine";
-import { createVehicle, addIdentifier } from "./service";
+import { createVehicle, addIdentifier, updateVehicle } from "./service";
 import { createEpisode } from "@/modules/episodes/service";
 
 const emptyToUndef = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
@@ -105,4 +105,47 @@ export async function addIdentifierAction(formData: FormData) {
   const { vehicleId, type, value, isPrimary } = parsed.data;
   await addIdentifier(user, vehicleId, type, value, isPrimary);
   revalidatePath(`/vehicles/${vehicleId}`);
+}
+
+/**
+ * Blank means "clear this field", not "leave it alone" — the edit form always
+ * posts every field, so an empty box is the user deliberately emptying it.
+ * `null` reaches the service; only fields absent from the payload are skipped.
+ */
+const blankToNull = (v: unknown) => (typeof v === "string" && v.trim() === "" ? null : v);
+
+const editVehicleSchema = z.object({
+  vehicleId: z.string().uuid(),
+  year: z.preprocess(blankToNull, z.coerce.number().int().min(1885).max(2100).nullable()),
+  make: z.string().trim().min(1, "Make is required"),
+  model: z.string().trim().min(1, "Model is required"),
+  trim: z.preprocess(blankToNull, z.string().trim().nullable()),
+  bodyStyle: z.preprocess(blankToNull, z.string().trim().nullable()),
+  exteriorColor: z.preprocess(blankToNull, z.string().trim().nullable()),
+  interiorColor: z.preprocess(blankToNull, z.string().trim().nullable()),
+  engineDescription: z.preprocess(blankToNull, z.string().trim().nullable()),
+  transmission: z.preprocess(blankToNull, z.string().trim().nullable()),
+  drivetrain: z.preprocess(blankToNull, z.string().trim().nullable()),
+  mileage: z.preprocess(blankToNull, z.coerce.number().int().min(0).nullable()),
+  mileageStatus: z.nativeEnum(MileageStatus),
+  generalDescription: z.preprocess(blankToNull, z.string().trim().nullable()),
+});
+
+export interface EditVehicleState {
+  error?: string;
+  saved?: boolean;
+}
+
+export async function updateVehicleAction(_prev: EditVehicleState, formData: FormData): Promise<EditVehicleState> {
+  const user = await getSessionUser();
+  requirePermission(user, "edit", "vehicles");
+  const parsed = editVehicleSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) {
+    return { error: parsed.error.issues.map((i) => i.message).join("; ") };
+  }
+  const { vehicleId, ...fields } = parsed.data;
+  await updateVehicle(user, vehicleId, fields);
+  revalidatePath(`/vehicles/${vehicleId}`);
+  revalidatePath("/vehicles");
+  return { saved: true };
 }
