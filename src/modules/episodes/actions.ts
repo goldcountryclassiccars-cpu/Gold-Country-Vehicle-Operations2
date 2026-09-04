@@ -4,7 +4,15 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/current-user";
 import { requirePermission, requireField } from "@/lib/authz/engine";
-import { changeEpisodeStatus, setAskingPrice, STATUS_DIMENSIONS, StatusError, type StatusDimension } from "./service";
+import {
+  archiveEpisode,
+  changeEpisodeStatus,
+  restoreEpisode,
+  setAskingPrice,
+  STATUS_DIMENSIONS,
+  StatusError,
+  type StatusDimension,
+} from "./service";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 
@@ -91,4 +99,38 @@ export async function updateArrangementAction(formData: FormData) {
     newValues: Object.keys(data),
   });
   revalidatePath(`/episodes/${d.episodeId}`);
+}
+
+const archiveSchema = z.object({
+  episodeId: z.string().uuid(),
+  reason: z.string().trim().min(1),
+});
+
+/**
+ * Archiving removes a car from every active list, so it is gated on the
+ * `archive` permission rather than plain `edit` — under the three-role model
+ * that means Admin only. Restoring is gated the same way.
+ */
+export async function archiveEpisodeAction(formData: FormData) {
+  const user = await getSessionUser();
+  requirePermission(user, "archive", "episodes");
+  const parsed = archiveSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  await archiveEpisode(user, parsed.data.episodeId, parsed.data.reason);
+  revalidatePath(`/episodes/${parsed.data.episodeId}`);
+  revalidatePath("/vehicles");
+  revalidatePath("/pipeline");
+  revalidatePath("/dashboard");
+}
+
+export async function restoreEpisodeAction(formData: FormData) {
+  const user = await getSessionUser();
+  requirePermission(user, "archive", "episodes");
+  const parsed = archiveSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  await restoreEpisode(user, parsed.data.episodeId, parsed.data.reason);
+  revalidatePath(`/episodes/${parsed.data.episodeId}`);
+  revalidatePath("/vehicles");
+  revalidatePath("/pipeline");
+  revalidatePath("/dashboard");
 }

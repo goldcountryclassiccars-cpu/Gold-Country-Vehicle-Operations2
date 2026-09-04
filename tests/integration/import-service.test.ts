@@ -131,7 +131,7 @@ describe("planImport", () => {
   it("warns rather than guessing silently when the identifier type is blank", async () => {
     const plan = await planImport(
       admin,
-      csv([{ make: MARKER, model: "Guess", deal_type: "Consignment", identifier_value: "AN5L4702" }]),
+      csv([{ make: MARKER, model: "Guess", deal_type: "Consignment", identifier_value: "ZZTEST0000001" }]),
     );
     expect(plan.rows[0]!.status).toBe("ready");
     expect(plan.rows[0]!.warnings.join(" ")).toContain("Short VIN");
@@ -161,7 +161,7 @@ describe("commitImport", () => {
           mileage: "74,010",
           mileage_status: "Actual",
           identifier_type: "Short VIN",
-          identifier_value: "208673109656",
+          identifier_value: "ZZTEST0000002",
           deal_type: "Consignment",
           asking_price: "$73,900",
           custody_status: "On site",
@@ -189,7 +189,7 @@ describe("commitImport", () => {
     expect(saved.vehicle.mileage).toBe(74010);
     expect(saved.vehicle.mileageStatus).toBe("ACTUAL");
     expect(saved.vehicle.generalDescription).toContain('15" wheels');
-    expect(saved.vehicle.identifiers[0]).toMatchObject({ type: "SHORT_VIN", value: "208673109656", isPrimary: true });
+    expect(saved.vehicle.identifiers[0]).toMatchObject({ type: "SHORT_VIN", value: "ZZTEST0000002", isPrimary: true });
   });
 
   it("records status history for the statuses the file set", async () => {
@@ -212,7 +212,7 @@ describe("commitImport", () => {
 
   it("skips the whole file on a second upload instead of duplicating the cars", async () => {
     const text = csv([
-      { make: MARKER, model: "Idempotent", deal_type: "Consignment", identifier_type: "VIN", identifier_value: "1FTFW1RG8LFC00001" },
+      { make: MARKER, model: "Idempotent", deal_type: "Consignment", identifier_type: "VIN", identifier_value: "ZZTEST0000003" },
     ]);
     const first = await commitImport(admin, await planImport(admin, text), new Set());
     await track(first);
@@ -244,7 +244,7 @@ describe("commitImport", () => {
   });
 
   it("holds back a possible duplicate until it is explicitly confirmed", async () => {
-    const text = csv([{ year: "1932", make: MARKER, model: "Roadster", deal_type: "Consignment" }]);
+    const text = csv([{ year: "1932", make: MARKER, model: "NoVinHere", deal_type: "Consignment" }]);
     const first = await commitImport(admin, await planImport(admin, text), new Set());
     await track(first);
 

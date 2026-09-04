@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { buildPermissionMap } from "@/lib/authz/resolve";
 import { ROLE_TEMPLATES } from "@/lib/authz/registry";
 import type { SessionUser } from "@/lib/authz/types";
-import { changeEpisodeStatus, createEpisode, setAskingPrice, StatusError } from "@/modules/episodes/service";
+import { archiveEpisode, changeEpisodeStatus, createEpisode, restoreEpisode, setAskingPrice, StatusError } from "@/modules/episodes/service";
 
 let user: SessionUser;
 let vehicleId: string;
@@ -111,5 +111,40 @@ describe("episode lifecycle", () => {
     const updated = await changeEpisodeStatus(user, episodeId, "financial", "FINANCIALLY_CLOSED");
     expect(updated.active).toBe(false);
     expect(updated.closedAt).not.toBeNull();
+  });
+});
+
+describe("archiving", () => {
+  it("takes an episode out of active inventory without destroying it, and puts it back", async () => {
+    const episode = await createEpisode(user, { vehicleId, dealType: "CONSIGNMENT" });
+    const archived = await archiveEpisode(user, episode.id, "Consignor withdrew the car");
+    expect(archived.active).toBe(false);
+    expect(archived.archivedAt).not.toBeNull();
+
+    // The record and its history survive — this is a soft delete, not a delete.
+    const stillThere = await db.inventoryEpisode.findUnique({ where: { id: episode.id } });
+    expect(stillThere).not.toBeNull();
+    const change = await db.statusChange.findFirst({ where: { episodeId: episode.id, dimension: "active" } });
+    expect(change?.reason).toBe("Consignor withdrew the car");
+
+    const restored = await restoreEpisode(user, episode.id, "Back on consignment");
+    expect(restored.active).toBe(true);
+    expect(restored.archivedAt).toBeNull();
+
+    await db.statusChange.deleteMany({ where: { episodeId: episode.id } });
+    await db.arrangement.deleteMany({ where: { episodeId: episode.id } });
+    await db.inventoryEpisode.delete({ where: { id: episode.id } });
+  });
+
+  it("is idempotent — archiving twice does not append a second history row", async () => {
+    const episode = await createEpisode(user, { vehicleId, dealType: "CONSIGNMENT" });
+    await archiveEpisode(user, episode.id, "first");
+    await archiveEpisode(user, episode.id, "second");
+    const changes = await db.statusChange.findMany({ where: { episodeId: episode.id, dimension: "active" } });
+    expect(changes).toHaveLength(1);
+
+    await db.statusChange.deleteMany({ where: { episodeId: episode.id } });
+    await db.arrangement.deleteMany({ where: { episodeId: episode.id } });
+    await db.inventoryEpisode.delete({ where: { id: episode.id } });
   });
 });

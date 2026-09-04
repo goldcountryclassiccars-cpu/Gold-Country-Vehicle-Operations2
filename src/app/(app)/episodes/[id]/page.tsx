@@ -8,7 +8,13 @@ import { vehicleLabel } from "@/modules/vehicles/service";
 import { sanitizeArrangementForUser } from "@/modules/vehicles/sanitize";
 import { displayStage, STAGE_TONE } from "@/modules/episodes/stage";
 import { STATUS_DIMENSIONS, type StatusDimension } from "@/modules/episodes/service";
-import { changeStatusAction, setPriceAction, updateArrangementAction } from "@/modules/episodes/actions";
+import {
+  archiveEpisodeAction,
+  changeStatusAction,
+  restoreEpisodeAction,
+  setPriceAction,
+  updateArrangementAction,
+} from "@/modules/episodes/actions";
 import { Badge, Card, DescriptionList, PageHeader, inputClass } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Episode" };
@@ -75,6 +81,12 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
           </div>
         }
       />
+
+      {!episode.active ? (
+        <p className="mb-4 rounded-md border border-stone-300 bg-stone-100 p-3 text-sm text-stone-700">
+          This vehicle is archived — it no longer appears in Vehicles, Pipeline or the dashboard counts. Its record and history are kept.
+        </p>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -244,6 +256,36 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
               </ol>
             )}
           </Card>
+
+          {hasPermission(user, "episodes", "archive") ? (
+            <Card>
+              <h2 className="text-base font-semibold text-stone-900">{episode.active ? "Archive this vehicle" : "Restore this vehicle"}</h2>
+              <p className="mt-1 text-sm text-stone-600">
+                {episode.active
+                  ? "Takes it out of Vehicles, Pipeline and the dashboard counts. Nothing is deleted and it can be restored."
+                  : "Puts it back into active inventory."}
+              </p>
+              <form action={episode.active ? archiveEpisodeAction : restoreEpisodeAction} className="mt-3 space-y-2">
+                <input type="hidden" name="episodeId" value={episode.id} />
+                <label htmlFor="archive-reason" className="block text-xs font-medium text-stone-700">
+                  Reason (required)
+                </label>
+                <input
+                  id="archive-reason"
+                  name="reason"
+                  required
+                  placeholder={episode.active ? "e.g. Consignor withdrew the car" : "e.g. Back on consignment"}
+                  className={inputClass}
+                />
+                <button
+                  type="submit"
+                  className="min-h-11 w-full rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-800 shadow-sm hover:bg-stone-50"
+                >
+                  {episode.active ? "Archive" : "Restore"}
+                </button>
+              </form>
+            </Card>
+          ) : null}
         </div>
       </div>
     </div>

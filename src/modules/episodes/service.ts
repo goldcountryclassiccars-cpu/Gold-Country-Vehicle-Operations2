@@ -155,6 +155,61 @@ export async function changeEpisodeStatus(
   return updated;
 }
 
+
+/**
+ * Takes an episode out of active inventory without destroying it.
+ *
+ * Business records are archived, never deleted (see ARCHITECTURE §5), so this
+ * flips `active` and stamps `archivedAt`, appends a StatusChange row like any
+ * other state change, and audits the reason. Reversible by `restoreEpisode`.
+ *
+ * A reason is required. "Why is this car not in the list any more" is exactly
+ * the question someone asks six months later, and an archive with no reason
+ * cannot answer it.
+ */
+export async function archiveEpisode(user: SessionUser, episodeId: string, reason: string) {
+  const episode = await db.inventoryEpisode.findUniqueOrThrow({ where: { id: episodeId } });
+  if (!episode.active) return episode;
+  const updated = await db.inventoryEpisode.update({
+    where: { id: episodeId },
+    data: { active: false, archivedAt: new Date() },
+  });
+  await db.statusChange.create({
+    data: { episodeId, dimension: "active", fromValue: "true", toValue: "false", reason, changedBy: user.id },
+  });
+  await audit(user, {
+    action: "episode.archive",
+    resourceType: "episode",
+    resourceId: episodeId,
+    previousValues: { active: true },
+    newValues: { active: false, stockNumber: episode.stockNumber },
+    reason,
+  });
+  return updated;
+}
+
+/** Puts an archived episode back into active inventory. */
+export async function restoreEpisode(user: SessionUser, episodeId: string, reason: string) {
+  const episode = await db.inventoryEpisode.findUniqueOrThrow({ where: { id: episodeId } });
+  if (episode.active) return episode;
+  const updated = await db.inventoryEpisode.update({
+    where: { id: episodeId },
+    data: { active: true, archivedAt: null },
+  });
+  await db.statusChange.create({
+    data: { episodeId, dimension: "active", fromValue: "false", toValue: "true", reason, changedBy: user.id },
+  });
+  await audit(user, {
+    action: "episode.restore",
+    resourceType: "episode",
+    resourceId: episodeId,
+    previousValues: { active: false },
+    newValues: { active: true, stockNumber: episode.stockNumber },
+    reason,
+  });
+  return updated;
+}
+
 /** Updates the asking price, appending price history + audit. */
 export async function setAskingPrice(user: SessionUser, episodeId: string, price: number, reason?: string) {
   const episode = await db.inventoryEpisode.findUniqueOrThrow({ where: { id: episodeId } });
