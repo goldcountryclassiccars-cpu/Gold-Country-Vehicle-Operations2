@@ -4,6 +4,13 @@
 
 generator client {
   provider = "prisma-client-js"
+  // relationJoins lets a nested `include` resolve in ONE query using LATERAL
+  // joins instead of one query per relation level. The session lookup in
+  // src/lib/auth/session.ts runs on every request and was costing eight
+  // sequential round trips to the database; with `relationLoadStrategy: "join"`
+  // it costs one. That is the difference between ~40ms and ~600ms once the
+  // database is a network hop away.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

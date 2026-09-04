@@ -51,7 +51,14 @@ export async function resolveSession() {
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
+  // relationLoadStrategy: "join" collapses this nested include into a single
+  // query with LATERAL joins. Prisma's default ("query") issues one statement
+  // per relation level -- session, user, userRole, role, rolePermission,
+  // roleFieldGrant, userDepartment, department -- which is eight sequential
+  // round trips on EVERY request, before the page has fetched any of its own
+  // data. Cheap on localhost; the dominant cost of a page load in production.
   const session = await db.session.findUnique({
+    relationLoadStrategy: "join",
     where: { tokenHash: hashToken(token) },
     include: {
       user: {

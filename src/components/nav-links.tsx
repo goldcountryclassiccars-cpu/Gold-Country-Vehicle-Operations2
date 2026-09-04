@@ -1,11 +1,31 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { NavIcon } from "@/components/nav-icon";
 import { accentFor } from "@/lib/nav-colors";
 import type { NavItem } from "@/lib/navigation";
+
+/**
+ * A spinner that appears on the link you just clicked, for as long as the
+ * navigation is in flight. Pages here are server-rendered against a remote
+ * database, so a click is never instant; without this the app looked frozen
+ * and people clicked again, queueing a second slow request.
+ *
+ * useLinkStatus only works inside a <Link>, hence the separate component.
+ */
+function NavSpinner() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span
+      role="status"
+      aria-label="Loading"
+      className="ml-auto h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600"
+    />
+  );
+}
 
 /**
  * Shared between the desktop sidebar and the mobile disclosure menu. Highlights
@@ -35,6 +55,7 @@ export function NavLinks({ items, onNavigate }: { items: NavItem[]; onNavigate?:
             >
               <NavIcon name={item.icon} className={clsx("h-4 w-4 shrink-0", active ? accent.activeIcon : "text-stone-400")} />
               {item.label}
+              <NavSpinner />
             </Link>
           </li>
         );

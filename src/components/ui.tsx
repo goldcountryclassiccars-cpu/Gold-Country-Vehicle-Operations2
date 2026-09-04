@@ -5,6 +5,7 @@
  */
 import { clsx } from "clsx";
 import type { ReactNode } from "react";
+import { PendingLink } from "@/components/pending-link";
 
 export function PageHeader({
   title,
@@ -202,10 +203,12 @@ export function StatTile({
     </div>
   );
   if (href) {
+    // Client navigation, not a full document reload — and a spinner while the
+    // next page is fetched, since these are slow server-rendered pages.
     return (
-      <a href={href} className="block rounded-lg hover:-translate-y-0.5 hover:shadow-md focus-visible:-translate-y-0.5 transition-transform">
+      <PendingLink href={href} className="block rounded-lg hover:-translate-y-0.5 hover:shadow-md focus-visible:-translate-y-0.5 transition-transform">
         {content}
-      </a>
+      </PendingLink>
     );
   }
   return content;

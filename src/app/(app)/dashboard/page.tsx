@@ -11,6 +11,7 @@ import { ROLE_TEMPLATES } from "@/lib/authz/registry";
 import { NavIcon } from "@/components/nav-icon";
 import { Badge, StatTile } from "@/components/ui";
 import { accentFor } from "@/lib/nav-colors";
+import { PendingLink } from "@/components/pending-link";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -71,7 +72,11 @@ export default async function DashboardPage() {
           .map((item) => {
             const accent = accentFor(item.href);
             return (
-              <a
+              // PendingLink, not a bare <a>: an <a> triggered a full document
+              // reload (new HTML, new JS, a fresh cold server render) on every
+              // tile click, which was the slowest possible way to move between
+              // pages. Client navigation reuses the shell and prefetches.
+              <PendingLink
                 key={item.href}
                 href={item.href}
                 className="group flex items-start gap-3 rounded-lg border border-stone-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
@@ -83,7 +88,7 @@ export default async function DashboardPage() {
                   <span className="block text-sm font-medium text-stone-900">{item.label}</span>
                   <span className="mt-0.5 block text-xs text-stone-500">Open {item.label.toLowerCase()}</span>
                 </span>
-              </a>
+              </PendingLink>
             );
           })}
       </div>

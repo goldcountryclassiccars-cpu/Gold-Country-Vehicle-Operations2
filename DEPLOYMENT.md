@@ -37,7 +37,13 @@ anyone who guesses a URL.
    strings; take these two, and note that neither of them is the one labelled
    "Direct connection":
    - **Transaction pooler**, port `6543` → `DATABASE_URL`. Append
-     `?pgbouncer=true&connection_limit=1`.
+     `?pgbouncer=true&connection_limit=5`.
+
+     `connection_limit=1` is the usual serverless advice, but it serialises
+     every query a single request makes — including the ones the app
+     deliberately issues in parallel with `Promise.all`. A transaction pooler
+     hands connections back per statement, so a small pool per function
+     instance is safe and lets those parallel queries actually overlap.
    - **Session pooler**, port `5432` → `DIRECT_URL`.
 
    Two are needed because serverless functions open far more connections than
@@ -67,12 +73,27 @@ anyone who guesses a URL.
    defines a `vercel-build` script that applies database migrations before
    building, so schema changes deploy automatically.
 3. Add the environment variables below, then deploy.
+4. **Check the function region matches the database region.** `vercel.json`
+   pins functions to `pdx1` (Portland), which sits alongside a Supabase
+   project in `us-west-2`. If the Supabase project is somewhere else, change
+   `vercel.json` to match it.
+
+   This is not a micro-optimisation. Vercel's default region is `iad1`
+   (Washington DC); with the database in Oregon, every single query became a
+   ~70ms transcontinental round trip, and a page that issues a dozen
+   sequential queries paid that a dozen times. It was the largest single
+   cause of the app feeling slow. Confirm it after deploying — the
+   `x-vercel-id` response header names the region that served the request:
+
+   ```
+   curl -sD - -o /dev/null https://<your-app>.vercel.app/api/health | grep x-vercel-id
+   ```
 
 ### Environment variables
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | Supabase **transaction pooler** URI (6543) + `?pgbouncer=true&connection_limit=1` |
+| `DATABASE_URL` | Supabase **transaction pooler** URI (6543) + `?pgbouncer=true&connection_limit=5` |
 | `DIRECT_URL` | Supabase **session pooler** URI (5432) — not "Direct connection" |
 | `SESSION_SECRET` | 32+ random bytes — `openssl rand -base64 32` |
 | `APP_URL` | `https://<your-project>.vercel.app` |
