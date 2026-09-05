@@ -5,6 +5,10 @@ import { getSessionUser } from "@/lib/auth/current-user";
 import { authorize, canViewField, hasPermission, requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
 import { releaseGate } from "@/modules/sales/service";
+import { saleComplianceSummary } from "@/modules/documents/requirements";
+import { completeSaleAction } from "@/modules/documents/actions";
+import { SaleDocInputs } from "./sale-doc-inputs";
+import { DocChecklist } from "./doc-checklist";
 import {
   cancelSaleAction,
   deliverVehicleAction,
@@ -47,7 +51,7 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
     db.documentTemplate.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
   ]);
   const buyer = sanitizePartyForUser(user, buyerRaw as unknown as Record<string, unknown>, "buyer_pii");
-  const gate = await releaseGate(sale.id);
+  const [gate, compliance] = await Promise.all([releaseGate(sale.id), saleComplianceSummary(sale.id)]);
 
   const canEdit = hasPermission(user, "sales", "edit");
   const canPay = hasPermission(user, "payments", "create");
@@ -56,6 +60,10 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
   const canSendDocs = hasPermission(user, "documents", "send");
   const canEditDocs = hasPermission(user, "documents", "edit");
   const canSeePaymentInfo = canViewField(user, "payment_info");
+  // Front Desk enters sale data and marks steps done; only Admin overrides a
+  // requirement or declares the file finished.
+  const canOverrideDocs = hasPermission(user, "documents", "override_gate");
+  const canCompleteSale = hasPermission(user, "sales", "complete");
   const open = !["CANCELED", "UNWOUND", "COMPLETE", "DELIVERED"].includes(sale.status);
   const applicableTemplates = templates.filter((t) => t.appliesTo === "all" || t.appliesTo === episode.dealType);
 
@@ -303,6 +311,37 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
           ) : null}
         </div>
       </div>
+
+      <section id="sale-docs" className="mt-8 space-y-6">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-stone-200 pb-3">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-stone-900">Sale documents</h2>
+            <p className="mt-0.5 text-sm text-stone-500">
+              Everything this particular sale needs, why it needs it, and what is still outstanding.
+            </p>
+          </div>
+          {compliance.rows.length > 0 && sale.status === "DELIVERED" && canCompleteSale ? (
+            <form action={completeSaleAction}>
+              <input type="hidden" name="saleId" value={sale.id} />
+              <button
+                disabled={!compliance.ok}
+                title={compliance.ok ? undefined : "Every required and unknown row has to be complete first."}
+                className="min-h-11 rounded-lg border border-brand-800 bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 disabled:pointer-events-none disabled:opacity-50"
+              >
+                Mark sale complete
+              </button>
+            </form>
+          ) : null}
+        </div>
+
+        <SaleDocInputs sale={sale} canEdit={canEdit && open} />
+        <DocChecklist
+          saleId={sale.id}
+          summary={compliance}
+          canEdit={canEditDocs && open}
+          canOverride={canOverrideDocs && open}
+        />
+      </section>
     </div>
   );
 }

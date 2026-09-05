@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { createSaleAction } from "@/modules/sales/actions";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { Badge, Card, EmptyState, PageHeader, inputClass } from "@/components/ui";
+import { consignorPayoutClock } from "@/modules/settlements/service";
 
 export const metadata: Metadata = { title: "Deals in Progress" };
 
@@ -49,6 +50,23 @@ export default async function SalesPage() {
     db.party.findMany({ where: { id: { in: [...new Set(sales.map((s) => s.buyerPartyId))] } }, select: { id: true, displayName: true } }),
   ]);
   const epById = new Map(episodes.map((e) => [e.id, e]));
+
+  // What is outstanding per deal, in one query rather than one per row — this
+  // list is the first screen of the morning and has to stay fast.
+  const outstanding = await db.saleDocumentRequirement.groupBy({
+    by: ["saleId"],
+    where: { saleId: { in: sales.map((sale) => sale.id) }, state: { in: ["REQUIRED", "UNKNOWN"] }, complete: false },
+    _count: { _all: true },
+  });
+  const blockersBySale = new Map(outstanding.map((row) => [row.saleId, row._count._all]));
+
+  // Consignor payout countdowns, for the consignment deals on this list.
+  const consignmentEpisodeIds = episodes.filter((e) => e.dealType === "CONSIGNMENT").map((e) => e.id);
+  const clocks = new Map(
+    await Promise.all(
+      consignmentEpisodeIds.map(async (id) => [id, await consignorPayoutClock(id)] as const),
+    ),
+  );
   const buyerById = new Map(buyers.map((b) => [b.id, b.displayName]));
 
   return (
@@ -106,6 +124,8 @@ export default async function SalesPage() {
         <div className="space-y-2">
           {sales.map((s) => {
             const ep = epById.get(s.episodeId);
+            const blockers = blockersBySale.get(s.id) ?? 0;
+            const clock = ep?.dealType === "CONSIGNMENT" ? clocks.get(ep.id) : null;
             return (
               <Link
                 key={s.id}
@@ -120,7 +140,21 @@ export default async function SalesPage() {
                     {buyerById.get(s.buyerPartyId) ?? "Buyer"} · ${Number(s.agreedPrice).toLocaleString()}
                   </p>
                 </div>
-                <Badge tone={statusTone[s.status]}>{s.status.toLowerCase().replace(/_/g, " ")}</Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  {blockers ? (
+                    <Badge tone={blockers > 0 ? "amber" : "green"}>
+                      {blockers} doc{blockers === 1 ? "" : "s"} outstanding
+                    </Badge>
+                  ) : null}
+                  {clock?.dueBy && !clock.blockedBy ? (
+                    <Badge tone={clock.overdue ? "red" : "teal"}>
+                      {clock.overdue
+                        ? `payout ${Math.abs(clock.daysRemaining ?? 0)}d overdue`
+                        : `payout in ${clock.daysRemaining}d`}
+                    </Badge>
+                  ) : null}
+                  <Badge tone={statusTone[s.status]}>{s.status.toLowerCase().replace(/_/g, " ")}</Badge>
+                </div>
               </Link>
             );
           })}

@@ -9,6 +9,7 @@ import {
   resetPasswordAction,
   resetRoleToTemplateAction,
   toggleUserActiveAction,
+  updateDealerConfigAction,
   updateSettingsAction,
 } from "@/modules/admin/actions";
 import { Badge, Card, PageHeader, inputClass } from "@/components/ui";
@@ -21,7 +22,7 @@ export default async function AdminPage() {
   if (!user) redirect("/login?expired=1");
   requirePermission(user, "manage_config", "admin");
 
-  const [users, roles, departments, stockSetting, settlementSetting] = await Promise.all([
+  const [users, roles, departments, stockSetting, settlementSetting, dealerSettings] = await Promise.all([
     db.user.findMany({
       include: { roles: { include: { role: true } }, departments: { include: { department: true } } },
       orderBy: { name: "asc" },
@@ -30,9 +31,20 @@ export default async function AdminPage() {
     db.department.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     db.appSetting.findUnique({ where: { key: "stock_number" } }),
     db.appSetting.findUnique({ where: { key: "settlement_deadline_days" } }),
+    db.appSetting.findMany({ where: { key: { startsWith: "dealer." } } }),
   ]);
   const stock = { prefix: "GC", nextNumber: 1001, ...((stockSetting?.value as object) ?? {}) } as { prefix: string; nextNumber: number };
   const settlementDays = typeof settlementSetting?.value === "number" ? settlementSetting.value : 14;
+  const dealer = Object.fromEntries(
+    dealerSettings.map((row) => [row.key.replace("dealer.", ""), typeof row.value === "string" ? row.value : ""]),
+  ) as Record<string, string>;
+  const DEALER_FIELDS = [
+    { name: "legalName", label: "Legal name", hint: "As it appears on the dealer license." },
+    { name: "dba", label: "Doing business as", hint: "The trading name customers see." },
+    { name: "address", label: "Address", hint: "Goes on the Buyers Guide and the REG 51." },
+    { name: "dealerLicenseNo", label: "Dealer license number", hint: "Required on the REG 51." },
+    { name: "sellersPermitNo", label: "Seller's permit number", hint: "CDTFA permit, required on the REG 51." },
+  ];
 
   const userColumns: Column<(typeof users)[number]>[] = [
     { key: "name", header: "Name", phone: "title", className: "font-medium text-stone-900", cell: (u) => u.name },
@@ -187,6 +199,36 @@ export default async function AdminPage() {
         </Card>
 
         <Card>
+          <h2 className="mb-3 text-base font-semibold text-stone-900">Dealer details on documents</h2>
+          <p className="mb-3 text-xs text-stone-500">
+            These print on the Buyers Guide, the REG 51 and every generated document. Enter them here rather than
+            anywhere in code — the license and permit numbers should not live in the repository or in a chat
+            transcript. Admins edit; the front desk can read them while filling in a form.
+          </p>
+          <form action={updateDealerConfigAction} className="grid gap-3 sm:grid-cols-2">
+            {DEALER_FIELDS.map((field) => (
+              <div key={field.name}>
+                <label htmlFor={`dealer-${field.name}`} className="block text-xs font-medium text-stone-500">
+                  {field.label}
+                </label>
+                <input
+                  id={`dealer-${field.name}`}
+                  name={field.name}
+                  defaultValue={dealer[field.name] ?? ""}
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-stone-400">{field.hint}</p>
+              </div>
+            ))}
+            <div className="sm:col-span-2">
+              <button type="submit" className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold shadow-sm hover:bg-stone-50">
+                Save dealer details
+              </button>
+            </div>
+          </form>
+        </Card>
+
+        <Card accent="stone">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Settings</h2>
           <form action={updateSettingsAction} className="grid gap-2 sm:grid-cols-4">
             <div>

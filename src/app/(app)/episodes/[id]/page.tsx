@@ -16,6 +16,8 @@ import {
   updateArrangementAction,
 } from "@/modules/episodes/actions";
 import { Badge, Card, DescriptionList, PageHeader, inputClass } from "@/components/ui";
+import { intakeReadiness } from "@/modules/documents/intake";
+import { consignorPayoutClock } from "@/modules/settlements/service";
 
 export const metadata: Metadata = { title: "Episode" };
 
@@ -45,6 +47,11 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
   if (!episode) notFound();
   const assigned = [episode.salespersonId, episode.operationsOwnerId].filter(Boolean) as string[];
   if (!authorize(user, "view", "episodes", { assignedUserIds: assigned })) notFound();
+
+  const [readiness, payoutClock] = await Promise.all([
+    intakeReadiness(episode.id),
+    episode.dealType === "CONSIGNMENT" ? consignorPayoutClock(episode.id) : null,
+  ]);
 
   const [source, location, history, seller] = await Promise.all([
     episode.acquisitionSourceId
@@ -86,6 +93,70 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
         <p className="mb-4 rounded-md border border-stone-300 bg-stone-100 p-3 text-sm text-stone-700">
           This vehicle is archived — it no longer appears in Vehicles, Pipeline or the dashboard counts. Its record and history are kept.
         </p>
+      ) : null}
+
+      {/* Intake paperwork is supposed to be done before the car is listed, so it
+          belongs here rather than being discovered at closing. */}
+      {readiness.items.length > 0 ? (
+        <Card accent={readiness.ready ? "green" : "amber"} className="mb-6">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-stone-900">Paperwork needed before this car is sold</h2>
+            <Badge tone={readiness.ready ? "green" : "amber"}>
+              {readiness.ready ? "nothing outstanding" : `${readiness.blockers.length} outstanding`}
+            </Badge>
+          </div>
+          <ul className="space-y-2">
+            {readiness.items.map((item) => (
+              <li key={item.key} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-stone-200 px-3 py-2">
+                <span className="min-w-0">
+                  <span className="text-sm font-medium text-stone-900">{item.name}</span>
+                  <p className="text-xs text-stone-500">{item.reason}</p>
+                </span>
+                <Badge
+                  tone={
+                    item.trackedOnSale
+                      ? "green"
+                      : item.state === "REQUIRED"
+                        ? "amber"
+                        : item.state === "UNKNOWN"
+                          ? "neutral"
+                          : "neutral"
+                  }
+                >
+                  {item.trackedOnSale
+                    ? "done on the deal"
+                    : item.state === "REQUIRED"
+                      ? "needed"
+                      : item.state === "UNKNOWN"
+                        ? "cannot answer yet"
+                        : "not needed"}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {payoutClock && (payoutClock.dueBy || payoutClock.blockedBy !== "No active deal") ? (
+        <Card accent={payoutClock.overdue ? "rose" : "teal"} className="mb-6">
+          <h2 className="text-base font-semibold text-stone-900">Consignor payout</h2>
+          {payoutClock.blockedBy ? (
+            <p className="mt-1 text-sm text-stone-600">
+              On hold — {payoutClock.blockedBy.toLowerCase()}. The clock starts when the buyer&rsquo;s funds clear.
+            </p>
+          ) : payoutClock.dueBy ? (
+            <p className={`mt-1 text-sm ${payoutClock.overdue ? "font-semibold text-red-700" : "text-stone-700"}`}>
+              {payoutClock.overdue
+                ? `Overdue by ${Math.abs(payoutClock.daysRemaining ?? 0)} day(s) — was due ${payoutClock.dueBy.toLocaleDateString()}.`
+                : `${payoutClock.daysRemaining} day(s) left — due ${payoutClock.dueBy.toLocaleDateString()}.`}
+            </p>
+          ) : null}
+          {payoutClock.cancellationWindowEndsAt ? (
+            <p className="mt-1 text-xs text-stone-500">
+              Buyer cancellation window ends {payoutClock.cancellationWindowEndsAt.toLocaleString()}.
+            </p>
+          ) : null}
+        </Card>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -209,6 +280,61 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
                   </div>
                 </form>
               ) : null}
+            </Card>
+          ) : null}
+
+          {canEdit ? (
+            <Card accent="violet">
+              <h2 className="mb-1 text-base font-semibold text-stone-900">Title and lien</h2>
+              <p className="mb-4 text-xs text-stone-500">
+                What the paperwork in the folder actually shows. These decide whether the sale needs a REG 227, a
+                REG 31, a REG 262 or a lien release — and nothing else in the app records them.
+              </p>
+              <DescriptionList
+                items={[
+                  { label: "Title status", value: episode.arrangement?.titleStatus ?? "not recorded" },
+                  { label: "Issued in", value: episode.arrangement?.titleState ?? "not recorded" },
+                  { label: "Lien", value: episode.arrangement?.lienStatus ?? "not recorded" },
+                ]}
+              />
+              <form action={updateArrangementAction} className="mt-4 grid gap-3 border-t border-stone-100 pt-4 sm:grid-cols-3">
+                <input type="hidden" name="episodeId" value={episode.id} />
+                <div>
+                  <label htmlFor="title-status" className="block text-xs font-medium text-stone-500">Title status</label>
+                  <select id="title-status" name="titleStatus" defaultValue={episode.arrangement?.titleStatus ?? ""} className={inputClass}>
+                    <option value="">Leave unchanged</option>
+                    <option value="present">In hand</option>
+                    <option value="missing">Missing</option>
+                    <option value="lien">Held by lienholder</option>
+                    <option value="pending">Pending</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="title-state" className="block text-xs font-medium text-stone-500">Issuing state</label>
+                  <input
+                    id="title-state"
+                    name="titleState"
+                    maxLength={2}
+                    placeholder="CA"
+                    defaultValue={episode.arrangement?.titleState ?? ""}
+                    className={`${inputClass} uppercase`}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="lien-status" className="block text-xs font-medium text-stone-500">Lien</label>
+                  <select id="lien-status" name="lienStatus" defaultValue={episode.arrangement?.lienStatus ?? ""} className={inputClass}>
+                    <option value="">Leave unchanged</option>
+                    <option value="none">None</option>
+                    <option value="lien">Open lien</option>
+                    <option value="released">Released</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-3">
+                  <button type="submit" className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold shadow-sm hover:bg-stone-50">
+                    Save title and lien
+                  </button>
+                </div>
+              </form>
             </Card>
           ) : null}
 

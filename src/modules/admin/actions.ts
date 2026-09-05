@@ -112,6 +112,42 @@ const settingsSchema = z.object({
   settlementDays: z.coerce.number().int().min(1).max(120),
 });
 
+/**
+ * Dealer identity, as it appears on every document.
+ *
+ * Admin-only to edit, readable by the front desk — Rose needs the license
+ * number to fill in a REG 51, and none of it is secret in the way a purchase
+ * price is. The values are entered here rather than committed to code, so the
+ * dealer license and seller's permit numbers never appear in the repository.
+ */
+const dealerSchema = z.object({
+  legalName: z.string().trim().max(200).optional(),
+  dba: z.string().trim().max(200).optional(),
+  address: z.string().trim().max(400).optional(),
+  dealerLicenseNo: z.string().trim().max(60).optional(),
+  sellersPermitNo: z.string().trim().max(60).optional(),
+});
+
+export async function updateDealerConfigAction(formData: FormData) {
+  const user = await getSessionUser();
+  requirePermission(user, "manage_config", "admin");
+  const parsed = dealerSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+
+  const changed: string[] = [];
+  for (const [field, value] of Object.entries(parsed.data)) {
+    if (value === undefined || value === "") continue;
+    const key = `dealer.${field}`;
+    await db.appSetting.upsert({ where: { key }, update: { value }, create: { key, value } });
+    changed.push(key);
+  }
+  if (changed.length === 0) return;
+  // The keys, never the values — a dealer license number should not land in an
+  // audit payload that gets exported.
+  await audit(user, { action: "admin.dealer_config.update", newValues: { keys: changed } });
+  revalidatePath("/admin");
+}
+
 export async function updateSettingsAction(formData: FormData) {
   const user = await getSessionUser();
   requirePermission(user, "manage_config", "admin");

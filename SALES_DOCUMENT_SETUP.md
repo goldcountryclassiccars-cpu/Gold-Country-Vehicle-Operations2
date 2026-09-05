@@ -12,12 +12,26 @@ mirrors this list and remains visible until configuration is complete.
    dealer-owned and consignment deals.
 2. **Approved templates** — the current, legally reviewed version of each document
    (PDF or Word), with an effective date.
-3. **Applicability rules** — when each document applies: deal type (owned vs. consignment),
-   buyer registration state, delivery state, vehicle age, payment method, transport method,
-   or other conditions.
+3. **Applicability rules** — **now captured in `prisma/document-registry.json`, which is
+   the source of truth.** That file holds 35 documents with a machine-readable rule for
+   each ("applies when the deal is a consignment", "applies when the sale price is under
+   $40,000 and the sale date is before 2026-10-01"), the signers, handling flags, submission
+   destination and effective dates. `prisma/seed-document-registry.ts` loads it into
+   `DocumentTemplate`; `src/modules/documents/rules.ts` evaluates it per sale and the deal
+   page shows the result with the reason in plain English.
+
+   What is still needed from the dealership is **confirmation, not authorship**: 12 of the
+   rules are flagged `verifyWithCounsel` and are shown on the checklist as "rule not yet
+   confirmed with counsel". Review those, and tell us about any document the dealership
+   uses that the registry does not list. Editing the JSON and re-running the seed is how a
+   rule changes — no code change is required.
 4. **Required fields** — every field each template needs filled, and which party supplies it.
-5. **Required signers and signing order** — buyer, co-buyer, seller, consignor, dealership
-   representative; and who signs first.
+   Partially captured: the registry's `worksheetFields` already drive the read-off worksheet
+   for the DMV forms. What is missing is the field-by-field map for the templates we will
+   fill programmatically in Phase B.
+5. **Required signers and signing order** — signers are captured per document in the
+   registry; **signing order is not**. Confirmed 2026-09-05: any Admin (Jade or Sergio) may
+   sign as "Dealer"; Front Desk never signs.
 6. **Allowed signature methods per document** — electronic signature eligibility, wet
    signature requirement, original-document requirement, notarization requirement.
 7. **Filing destinations and retention** — where each completed document is filed
@@ -30,7 +44,18 @@ mirrors this list and remains visible until configuration is complete.
    ships with a development mock and a provider-neutral adapter interface.
 10. **Consignor settlement deadline policy** — the number of days after sale funds clear
     within which consignors must be paid (configurable in Administration; the system does
-    not hardcode a legal conclusion).
+    not hardcode a legal conclusion). The countdown now runs from **when the buyer's funds
+    cleared**, and a payout is blocked until they have cleared and any buyer cancellation
+    window has closed.
+11. **Dealer identity for documents** — legal name, DBA, address, dealer license number and
+    seller's permit number. Entered in **Administration → Dealer details on documents**, and
+    deliberately never committed to the repository or pasted into a transcript.
+12. **CARS Act cut-over confirmation** — the registry swaps the Contract Cancellation Option
+    for the 3-Day Right to Cancel on 2026-10-01, with price ceilings of $40,000 and $50,000
+    respectively, and reads the cancellation window as ending at close of business on the
+    third calendar day after delivery. **Weekend and holiday handling is unconfirmed**, and
+    the statutory text of the new notice has to come from counsel/CADA — the app will not
+    draft it.
 
 ## What the system does in the meantime
 

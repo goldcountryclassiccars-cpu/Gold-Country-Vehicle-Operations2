@@ -288,19 +288,10 @@ export async function saleComplianceSummary(saleId: string): Promise<ComplianceS
   const unknownCount = mapped.filter((r) => r.state === "UNKNOWN").length;
   const completeCount = gating.length - blockers.length;
 
-  const reasons = new Map<string, number>();
-  for (const b of blockers) {
-    if (b.state === "UNKNOWN") {
-      reasons.set(b.reason.toLowerCase(), (reasons.get(b.reason.toLowerCase()) ?? 0) + 1);
-      continue;
-    }
-    for (const step of b.outstanding) reasons.set(step, (reasons.get(step) ?? 0) + 1);
-  }
-  const detail = [...reasons.entries()].map(([label, n]) => `${n} ${label}`).join(", ");
   const headline =
     gating.length === 0
       ? "No document requirements evaluated yet."
-      : `${completeCount} of ${gating.length} required items complete${detail ? ` — ${detail}` : ""}`;
+      : `${completeCount} of ${gating.length} required items complete${summarise(blockers)}`;
 
   return {
     rows: mapped,
@@ -311,6 +302,45 @@ export async function saleComplianceSummary(saleId: string): Promise<ComplianceS
     headline,
     ok: blockers.length === 0 && gating.length > 0,
   };
+}
+
+/**
+ * Condenses the blockers into the one line at the top of the checklist.
+ *
+ * Deliberately grouped and capped. Listing each outstanding step separately
+ * produced a header longer than the phone screen it sits on — which defeats the
+ * point of a sticky summary. Three groups plus the unknown count is what fits
+ * and what someone actually acts on.
+ */
+function summarise(blockers: ComplianceRow[]): string {
+  if (blockers.length === 0) return "";
+
+  const groups = new Map<string, number>();
+  const bump = (label: string) => groups.set(label, (groups.get(label) ?? 0) + 1);
+
+  const unknowns = blockers.filter((b) => b.state === "UNKNOWN");
+  for (const b of blockers) {
+    if (b.state === "UNKNOWN") continue;
+    if (b.outstanding.some((s) => s.endsWith("signature"))) bump("missing signatures");
+    if (b.outstanding.includes("original not received")) bump("originals not received");
+    if (b.outstanding.includes("not collected")) bump("not collected");
+    if (b.outstanding.includes("not submitted")) bump("not submitted");
+    if (b.outstanding.includes("buyer copy not given")) bump("buyer copies not given");
+    if (b.outstanding.includes("not filed")) bump("not filed");
+  }
+
+  const parts = [...groups.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([label, n]) => `${n} ${label}`);
+
+  if (unknowns.length > 0) {
+    // Name the first thing to go and ask, rather than just counting unknowns.
+    const first = unknowns[0]!.reason.replace(/^Needs:\s*/i, "");
+    parts.push(`${unknowns.length} unknown (needs ${first})`);
+  }
+
+  return parts.length ? ` — ${parts.join(", ")}` : "";
 }
 
 /** Recomputes and stores `complete` for one row after a status change. */

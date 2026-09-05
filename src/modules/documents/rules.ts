@@ -89,10 +89,11 @@ const FIELD_LABELS: Record<string, string> = {
   "title.hasPriceField": "Title has a price field",
   "title.sellerNameMatches": "Title seller name matches",
   "title.reassignmentSpaceAvailable": "Title reassignment space",
-  "manual.reg256Needed": "REG 256 needed (manual)",
-  "manual.reg135Needed": "REG 135 needed (manual)",
-  "manual.consignorPOA": "Consignor power of attorney needed",
-  "manual.buyerPOA": "Buyer power of attorney needed",
+  "manual.reg256Needed": "Statement of Facts needed for another reason",
+  "manual.reg135Needed": "REG 135 needed for another reason",
+  "manual.consignorPOA": "Consignor power of attorney",
+  "manual.buyerPOA": "Buyer power of attorney",
+  "manual.smogExemptionClaimed": "Smog exemption claimed",
 };
 
 /** Falls back to humanising the path so a new registry field is never nameless. */
@@ -196,6 +197,19 @@ function phraseLeaf(leaf: RuleLeaf, actual: unknown, result: boolean): string {
   const label = fieldLabel(leaf.field);
   const av = formatValue(leaf.field, actual);
   const ev = formatValue(leaf.field, leaf.value);
+
+  // Almost every document in the registry says "applies to any sale" as
+  // `sale.agreedPrice exists`. Rendering that literally gives every row the
+  // reason "Sale price is recorded", which tells an employee nothing.
+  if (leaf.field === "sale.agreedPrice" && leaf.op === "exists") {
+    return result ? "Applies to every sale" : "No agreed price yet";
+  }
+
+  // A yes/no fact reads best as the fact itself. "Motorcycle: no" beats
+  // "Motorcycle is no, not yes".
+  if (typeof actual === "boolean" && (leaf.op === "eq" || leaf.op === "neq")) {
+    return `${label}: ${actual ? "yes" : "no"}`;
+  }
 
   switch (leaf.op) {
     case "exists":
