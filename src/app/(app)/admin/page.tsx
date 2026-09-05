@@ -22,7 +22,8 @@ export default async function AdminPage() {
   if (!user) redirect("/login?expired=1");
   requirePermission(user, "manage_config", "admin");
 
-  const [users, roles, departments, stockSetting, settlementSetting, dealerSettings] = await Promise.all([
+  const [users, roles, departments, stockSetting, settlementSetting, dealerSettings, registrySetting, activeTemplateCount] =
+    await Promise.all([
     db.user.findMany({
       include: { roles: { include: { role: true } }, departments: { include: { department: true } } },
       orderBy: { name: "asc" },
@@ -32,12 +33,21 @@ export default async function AdminPage() {
     db.appSetting.findUnique({ where: { key: "stock_number" } }),
     db.appSetting.findUnique({ where: { key: "settlement_deadline_days" } }),
     db.appSetting.findMany({ where: { key: { startsWith: "dealer." } } }),
+    db.appSetting.findUnique({ where: { key: "documents.registry" } }),
+    db.documentTemplate.count({ where: { active: true } }),
   ]);
   const stock = { prefix: "GC", nextNumber: 1001, ...((stockSetting?.value as object) ?? {}) } as { prefix: string; nextNumber: number };
   const settlementDays = typeof settlementSetting?.value === "number" ? settlementSetting.value : 14;
   const dealer = Object.fromEntries(
     dealerSettings.map((row) => [row.key.replace("dealer.", ""), typeof row.value === "string" ? row.value : ""]),
   ) as Record<string, string>;
+  // Whether the document registry actually loaded. Without this the only way to
+  // tell a seeded database from one still holding the five old demo templates
+  // is to count rows and guess.
+  const registry = (registrySetting?.value ?? null) as
+    | { version?: string; templates?: number; verifyWithCounsel?: number; loadedAt?: string }
+    | null;
+
   const DEALER_FIELDS = [
     { name: "legalName", label: "Legal name", hint: "As it appears on the dealer license." },
     { name: "dba", label: "Doing business as", hint: "The trading name customers see." },
@@ -196,6 +206,31 @@ export default async function AdminPage() {
               </li>
             ))}
           </ul>
+        </Card>
+
+        <Card>
+          <h2 className="mb-3 text-base font-semibold text-stone-900">Sale-document registry</h2>
+          {registry?.version ? (
+            <p className="text-sm text-stone-700">
+              Registry <strong>{registry.version}</strong> loaded — {registry.templates} document templates,{" "}
+              {activeTemplateCount} active.{" "}
+              {registry.verifyWithCounsel ? (
+                <span className="text-amber-800">
+                  {registry.verifyWithCounsel} rules are still flagged for review with counsel.
+                </span>
+              ) : null}
+            </p>
+          ) : (
+            <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              The document registry has not been loaded. Sale checklists will be empty or wrong until it is. It loads
+              automatically on deploy; if this message persists after a deploy, check the Vercel build log for
+              <code className="mx-1">seed-document-registry</code>.
+            </p>
+          )}
+          <p className="mt-2 text-xs text-stone-500">
+            Which documents a sale needs is decided by <code>prisma/document-registry.json</code>. Editing that file and
+            deploying is how a rule changes — no code change, and the seed re-runs on every deploy.
+          </p>
         </Card>
 
         <Card>

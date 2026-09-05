@@ -240,6 +240,18 @@ async function main() {
 
   const needsCounsel = planned.filter((p) => p.data.verifyWithCounsel).length;
   console.log(`\n${needsCounsel} template(s) marked verifyWithCounsel — rules and thresholds need confirming before production use.`);
+
+  // Stamp what was loaded so Administration can say so out loud. Without this
+  // there is no way to tell a freshly-seeded database from one still holding
+  // the five old demo templates except by counting rows and guessing.
+  if (apply) {
+    const value = { version: registry.version, templates: planned.length, verifyWithCounsel: needsCounsel, loadedAt: new Date().toISOString() };
+    await db.appSetting.upsert({
+      where: { key: "documents.registry" },
+      update: { value },
+      create: { key: "documents.registry", value },
+    });
+  }
 }
 
 if (require.main === module) {
