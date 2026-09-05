@@ -62,6 +62,12 @@ const arrangementSchema = z.object({
   guaranteedConsignorNet: z.preprocess(emptyToUndef, z.coerce.number().min(0).optional()),
   minimumAcceptablePrice: z.preprocess(emptyToUndef, z.coerce.number().min(0).optional()),
   ownerNotes: z.preprocess(emptyToUndef, z.string().optional()),
+  // Title and lien state are not confidential economics — they are the facts
+  // the sale-document rules read (REG 227, REG 31, REG 262, lien release), and
+  // until now nothing in the app could set them at all.
+  titleStatus: z.preprocess(emptyToUndef, z.enum(["present", "missing", "lien", "pending"]).optional()),
+  titleState: z.preprocess(emptyToUndef, z.string().trim().length(2).toUpperCase().optional()),
+  lienStatus: z.preprocess(emptyToUndef, z.enum(["none", "lien", "open", "active", "released"]).optional()),
 });
 
 /** Owner/finance-grade edit of confidential arrangement economics. */
@@ -89,6 +95,9 @@ export async function updateArrangementAction(formData: FormData) {
     requireField(user, "owner_notes");
     data.ownerNotes = d.ownerNotes;
   }
+  if (d.titleStatus !== undefined) data.titleStatus = d.titleStatus;
+  if (d.titleState !== undefined) data.titleState = d.titleState;
+  if (d.lienStatus !== undefined) data.lienStatus = d.lienStatus;
   if (Object.keys(data).length === 0) return;
 
   await db.arrangement.update({ where: { episodeId: d.episodeId }, data });
@@ -98,6 +107,9 @@ export async function updateArrangementAction(formData: FormData) {
     resourceId: d.episodeId,
     newValues: Object.keys(data),
   });
+  // Title and lien facts change what paperwork an open deal needs.
+  const { reevaluateEpisodeSales } = await import("@/modules/documents/requirements");
+  await reevaluateEpisodeSales(user, d.episodeId);
   revalidatePath(`/episodes/${d.episodeId}`);
 }
 

@@ -12,6 +12,91 @@ import { effectiveAmount, snapshotProfit, FinanceError } from "@/modules/finance
 
 export class SettlementError extends Error {}
 
+/**
+ * When the buyer's money actually cleared — the anchor for the consignor payout
+ * deadline, and half of the gate below.
+ *
+ * Deliberately the LAST cleared payment, not the first: the clock on paying a
+ * consignor starts when the dealership holds all the funds, not when a deposit
+ * landed.
+ */
+export function fundsClearedAt(payments: { status: string; kind: string; clearedAt: Date | null }[]): Date | null {
+  const cleared = payments
+    .filter((p) => p.status === "CLEARED" && p.kind !== "REFUND" && p.clearedAt)
+    .map((p) => p.clearedAt!.getTime());
+  return cleared.length ? new Date(Math.max(...cleared)) : null;
+}
+
+export interface ConsignorPayoutClock {
+  fundsClearedAt: Date | null;
+  cancellationWindowEndsAt: Date | null;
+  /** Funds cleared + the configured payout days. Null until funds clear. */
+  dueBy: Date | null;
+  daysRemaining: number | null;
+  overdue: boolean;
+  /** Why a payout cannot be raised yet, or null when it can. */
+  blockedBy: string | null;
+}
+
+export async function consignorPayoutDays(): Promise<number> {
+  const setting = await db.appSetting.findUnique({ where: { key: "settlement_deadline_days" } });
+  return typeof setting?.value === "number" ? setting.value : 14;
+}
+
+/**
+ * The countdown shown on the vehicle page and in Deals in Progress.
+ *
+ * Two independent things hold a payout: the money has to have cleared, and any
+ * cancellation window has to have closed. Paying a consignor inside the CARS
+ * Act window means the dealership has given away money for a car the buyer can
+ * still hand back.
+ */
+export async function consignorPayoutClock(episodeId: string, now = new Date()): Promise<ConsignorPayoutClock> {
+  const sale = await db.saleTransaction.findFirst({
+    where: { episodeId, status: { notIn: ["CANCELED", "UNWOUND"] } },
+    orderBy: { createdAt: "desc" },
+    include: { payments: true },
+  });
+  const empty: ConsignorPayoutClock = {
+    fundsClearedAt: null,
+    cancellationWindowEndsAt: null,
+    dueBy: null,
+    daysRemaining: null,
+    overdue: false,
+    blockedBy: "No active deal",
+  };
+  if (!sale) return empty;
+
+  const cleared = fundsClearedAt(sale.payments);
+  const fullyFunded =
+    sale.payments
+      .filter((p) => p.status === "CLEARED" && p.kind !== "REFUND")
+      .reduce((sum, p) => sum + Number(p.amount), 0) >= Number(sale.agreedPrice);
+  const window = sale.cancellationWindowEndsAt;
+
+  const blockedBy = !cleared || !fullyFunded
+    ? "Buyer funds have not cleared"
+    : window && window > now
+      ? `Cancellation window closes ${window.toLocaleDateString()}`
+      : null;
+
+  if (!cleared || !fullyFunded) {
+    return { ...empty, cancellationWindowEndsAt: window, blockedBy };
+  }
+
+  const days = await consignorPayoutDays();
+  const dueBy = new Date(cleared.getTime() + days * 86400_000);
+  const daysRemaining = Math.ceil((dueBy.getTime() - now.getTime()) / 86400_000);
+  return {
+    fundsClearedAt: cleared,
+    cancellationWindowEndsAt: window,
+    dueBy,
+    daysRemaining,
+    overdue: daysRemaining < 0,
+    blockedBy,
+  };
+}
+
 export interface SettlementComputation {
   salePrice: number;
   commissionAmount: number;
@@ -67,15 +152,26 @@ export async function createSettlement(user: SessionUser, episodeId: string) {
   if (existing) throw new SettlementError("A settlement already exists for this episode");
   const episode = await db.inventoryEpisode.findUniqueOrThrow({ where: { id: episodeId }, include: { arrangement: true } });
   if (!episode.arrangement?.sellerPartyId) throw new SettlementError("No consignor party on the arrangement");
+
+  // Both gates first, before any lookup that can fail obscurely. The funded-sale
+  // query below used to run first, so an unfunded deal produced a raw Prisma
+  // "no record was found" instead of telling the employee the money has not
+  // cleared yet.
+  const clock = await consignorPayoutClock(episodeId);
+  if (clock.blockedBy) throw new SettlementError(`Cannot raise a consignor settlement yet — ${clock.blockedBy}.`);
+
   const sale = await db.saleTransaction.findFirstOrThrow({
     where: { episodeId, status: { in: ["DELIVERED", "COMPLETE", "RELEASED", "FUNDED"] } },
     orderBy: { createdAt: "desc" },
   });
+
   const c = await computeSettlement(episodeId);
 
-  const deadlineSetting = await db.appSetting.findUnique({ where: { key: "settlement_deadline_days" } });
-  const days = typeof deadlineSetting?.value === "number" ? deadlineSetting.value : 14;
-  const anchor = sale.deliveredAt ?? new Date();
+  // The deadline runs from when the funds cleared, not from delivery: a car can
+  // sit undelivered for weeks after it is paid for, and the consignor's clock
+  // does not wait for the transporter.
+  const anchor = clock.fundsClearedAt ?? sale.deliveredAt ?? new Date();
+  const days = await consignorPayoutDays();
 
   const settlement = await db.settlement.create({
     data: {
@@ -87,7 +183,7 @@ export async function createSettlement(user: SessionUser, episodeId: string) {
       commissionAmount: c.commissionAmount,
       expenseChargebacks: c.expenseChargebacks,
       netToConsignor: c.netToConsignor,
-      dueBy: new Date(anchor.getTime() + days * 86400_000),
+      dueBy: clock.dueBy ?? new Date(anchor.getTime() + days * 86400_000),
       detail: JSON.parse(JSON.stringify(c.lines)),
       createdById: user.id,
     },

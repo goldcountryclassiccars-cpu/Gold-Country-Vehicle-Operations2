@@ -1,7 +1,7 @@
 /**
  * Vehicle domain services. Callers authorize BEFORE calling (requirePermission).
  */
-import { IdentifierType, MileageStatus, Prisma } from "@prisma/client";
+import { FuelType, IdentifierType, MileageStatus, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import type { SessionUser } from "@/lib/authz/types";
@@ -79,6 +79,8 @@ export interface UpdateVehicleInput {
   mileage?: number | null;
   mileageStatus?: MileageStatus;
   generalDescription?: string | null;
+  fuelType?: FuelType | null;
+  isMotorcycle?: boolean;
 }
 
 const EDITABLE_FIELDS = [
@@ -95,6 +97,10 @@ const EDITABLE_FIELDS = [
   "mileage",
   "mileageStatus",
   "generalDescription",
+  // Both drive sale-document rules: electric and pre-1998 diesel are smog
+  // exempt, and a motorcycle needs neither a Buyers Guide nor a smog check.
+  "fuelType",
+  "isMotorcycle",
 ] as const;
 
 /**
@@ -139,6 +145,13 @@ export async function updateVehicle(user: SessionUser, vehicleId: string, input:
     previousValues,
     newValues,
   });
+
+  // The document rules read the vehicle, so a correction here can change what
+  // paperwork a live deal needs. Refresh every open sale on this car.
+  const { reevaluateEpisodeSales } = await import("@/modules/documents/requirements");
+  const episodes = await db.inventoryEpisode.findMany({ where: { vehicleId }, select: { id: true } });
+  for (const episode of episodes) await reevaluateEpisodeSales(user, episode.id);
+
   return updated;
 }
 

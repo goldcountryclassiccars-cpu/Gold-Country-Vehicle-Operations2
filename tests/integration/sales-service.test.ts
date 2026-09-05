@@ -51,7 +51,9 @@ beforeAll(async () => {
   const fiona = await db.user.findUniqueOrThrow({ where: { email: "finance@demo.gccc" } });
   owner = sessionUserFor("admin", jade);
   finance = sessionUserFor("front_desk", fiona);
-  const vehicle = await db.vehicle.create({ data: { make: "SaleTest", model: "S", year: 1969 } });
+  // mileageStatus is required before a deal can open — it is the odometer
+  // disclosure, and a sale may not leave DRAFT while it is UNKNOWN.
+  const vehicle = await db.vehicle.create({ data: { make: "SaleTest", model: "S", year: 1969, mileageStatus: "ACTUAL" } });
   vehicleId = vehicle.id;
   const episode = await db.inventoryEpisode.create({
     data: { vehicleId, stockNumber: `ST-${Date.now()}`, dealType: "DEALER_PURCHASE", askingPrice: 20000 },
@@ -128,7 +130,7 @@ describe("deal lifecycle", () => {
 describe("release gate enforcement + cancel/resell", () => {
   it("blocks non-owner release when gate is closed; owner override works and is audited", async () => {
     // fresh vehicle for a second deal
-    const v = await db.vehicle.create({ data: { make: "SaleTest2", model: "S2" } });
+    const v = await db.vehicle.create({ data: { make: "SaleTest2", model: "S2", mileageStatus: "ACTUAL" } });
     const ep = await db.inventoryEpisode.create({
       data: { vehicleId: v.id, stockNumber: `ST2-${Date.now()}`, dealType: "DEALER_PURCHASE", askingPrice: 9000 },
     });
@@ -160,7 +162,7 @@ describe("release gate enforcement + cancel/resell", () => {
   });
 
   it("canceling a deal returns the vehicle to AVAILABLE and keeps the record", async () => {
-    const v = await db.vehicle.create({ data: { make: "SaleTest3", model: "S3" } });
+    const v = await db.vehicle.create({ data: { make: "SaleTest3", model: "S3", mileageStatus: "ACTUAL" } });
     const ep = await db.inventoryEpisode.create({
       data: { vehicleId: v.id, stockNumber: `ST3-${Date.now()}`, dealType: "CONSIGNMENT", askingPrice: 5000 },
     });

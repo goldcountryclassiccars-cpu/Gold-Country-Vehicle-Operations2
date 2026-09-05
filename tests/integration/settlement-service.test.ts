@@ -75,6 +75,15 @@ beforeAll(async () => {
     },
   });
   saleId = sale.id;
+  // A consignor payout is now gated on the buyer's money having cleared, and
+  // the payout deadline is anchored to when it did — so a delivered deal needs
+  // its funds on the record, which is what a real one always has.
+  await db.payment.create({
+    data: {
+      saleId: sale.id, kind: "FINAL", method: "WIRE", status: "CLEARED",
+      amount: 28000, receivedAt: new Date(), clearedAt: new Date(), recordedById: jade.id,
+    },
+  });
   await db.expenseEntry.create({
     data: {
       episodeId, categoryId, description: "Consignor-approved brake work", responsibility: "CONSIGNOR",
@@ -85,6 +94,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.expenseEntry.deleteMany({ where: { episodeId } });
+  await db.payment.deleteMany({ where: { saleId } });
   await db.settlement.deleteMany({ where: { episodeId } });
   await db.profitSnapshot.deleteMany({ where: { episodeId } });
   await db.transportJob.deleteMany({ where: { episodeId } });
