@@ -25,7 +25,14 @@ const statusTone = {
   UNWOUND: "red",
 } as const;
 
-export default async function SalesPage() {
+export default async function SalesPage({
+  searchParams,
+}: {
+  // The Pipeline's "Start a deal" button links here with the car already
+  // chosen, so the person is not re-picking a vehicle they just tapped.
+  searchParams: Promise<{ episode?: string }>;
+}) {
+  const { episode: preselect } = await searchParams;
   const user = await getSessionUser();
   if (!user) redirect("/login?expired=1");
   requirePermission(user, "view", "sales");
@@ -79,7 +86,7 @@ export default async function SalesPage() {
           <form action={createSaleAction} className="grid gap-2 sm:grid-cols-6">
             <div className="sm:col-span-2">
               <label htmlFor="s-episode" className="block text-xs font-medium text-stone-500">Vehicle</label>
-              <select id="s-episode" name="episodeId" required className={inputClass}>
+              <select id="s-episode" name="episodeId" defaultValue={preselect} required className={inputClass}>
                 {availableEpisodes.map((e) => (
                   <option key={e.id} value={e.id}>{e.stockNumber} — {vehicleLabel(e.vehicle)}</option>
                 ))}

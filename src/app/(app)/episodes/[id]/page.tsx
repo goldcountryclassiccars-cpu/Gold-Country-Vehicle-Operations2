@@ -6,7 +6,8 @@ import { authorize, canViewField, hasPermission, requirePermission } from "@/lib
 import { db } from "@/lib/db";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { sanitizeArrangementForUser } from "@/modules/vehicles/sanitize";
-import { displayStage, STAGE_TONE } from "@/modules/episodes/stage";
+import { BOARD_BLURB, BOARD_TONE, boardStage } from "@/modules/episodes/board";
+import { StageLockedNote, StageMove } from "@/components/stage-move";
 import { STATUS_DIMENSIONS, type StatusDimension } from "@/modules/episodes/service";
 import {
   archiveEpisodeAction,
@@ -74,7 +75,7 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
       <PageHeader
         title={`${episode.stockNumber} — ${vehicleLabel(episode.vehicle)}`}
         subtitle={episode.dealType === "CONSIGNMENT" ? "Consignment" : episode.dealType === "DEALER_PURCHASE" ? "Dealer-owned" : episode.dealType}
-        badge={<Badge tone={STAGE_TONE[displayStage(episode)]}>{displayStage(episode)}</Badge>}
+        badge={<Badge tone={BOARD_TONE[boardStage(episode)]}>{boardStage(episode)}</Badge>}
         actions={
           <div className="flex gap-2">
             <Link href={`/vehicles/${episode.vehicleId}`} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm hover:bg-stone-50">
@@ -161,8 +162,31 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {/* Stage first, and one button. The six status dimensions below are
+            * still the source of truth, but nobody should have to drive them by
+            * hand to move a car along — see src/modules/episodes/board.ts. */}
+          <Card accent="brand">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-stone-900">Stage</h2>
+              <Badge tone={BOARD_TONE[boardStage(episode)]}>{boardStage(episode)}</Badge>
+            </div>
+            <p className="mt-1 text-sm text-stone-500">{BOARD_BLURB[boardStage(episode)]}</p>
+            <StageMove episode={episode} episodeId={episode.id} canEdit={canEdit} />
+            <StageLockedNote episode={episode} />
+          </Card>
+
           <Card>
-            <h2 className="mb-4 text-base font-semibold text-stone-900">Status</h2>
+            <details>
+              <summary className="cursor-pointer text-base font-semibold text-stone-900">
+                Detailed status
+                <span className="ml-2 text-xs font-normal text-stone-500">
+                  the six fields the stage is worked out from
+                </span>
+              </summary>
+              <p className="mt-2 mb-4 text-xs text-stone-500">
+                Set these only when the one-button move above does not describe what happened —
+                a car away at a vendor, a listing paused, a deal unwound.
+              </p>
             <div className="grid gap-4 sm:grid-cols-2">
               {DIMENSION_META.map((dim) => {
                 const current = (episode as unknown as Record<string, string>)[dim.field] ?? "";
@@ -191,6 +215,7 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
                 );
               })}
             </div>
+            </details>
           </Card>
 
           <Card>

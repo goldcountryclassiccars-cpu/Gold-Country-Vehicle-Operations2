@@ -15,6 +15,7 @@ import {
 } from "./service";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
+import { nextMove, writesToReach, type BoardStage, type StatusWrite } from "./board";
 
 const statusSchema = z.object({
   episodeId: z.string().uuid(),
@@ -144,5 +145,51 @@ export async function restoreEpisodeAction(formData: FormData) {
   revalidatePath(`/episodes/${parsed.data.episodeId}`);
   revalidatePath("/vehicles");
   revalidatePath("/pipeline");
+  revalidatePath("/dashboard");
+}
+
+/**
+ * The Pipeline's forward button, and its "move it somewhere else" picker.
+ *
+ * Both resolve the writes SERVER-SIDE from the episode's current state rather
+ * than trusting a list of status changes posted by the browser. The board is a
+ * simplification for the operator, not a new way to set arbitrary statuses: a
+ * form that posted its own writes would be a second, unvalidated path into the
+ * same fields the six dropdowns already guard.
+ */
+const stageSchema = z.object({
+  episodeId: z.string().uuid(),
+  /** Present for the picker; absent means "one step forward". */
+  to: z.string().optional(),
+});
+
+export async function moveStageAction(formData: FormData) {
+  const user = await getSessionUser();
+  requirePermission(user, "edit", "episodes");
+  const parsed = stageSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  const { episodeId, to } = parsed.data;
+
+  const episode = await db.inventoryEpisode.findUnique({ where: { id: episodeId } });
+  if (!episode) return;
+
+  let writes: StatusWrite[] | null;
+  let reason: string;
+  if (to) {
+    writes = writesToReach(episode, to as BoardStage);
+    reason = `Moved to ${to} on the Pipeline`;
+  } else {
+    const move = nextMove(episode, episodeId);
+    writes = move && move.kind === "advance" ? move.writes : null;
+    reason = move ? `Moved to ${move.to} on the Pipeline` : "";
+  }
+  if (!writes) return; // Stale button: the car moved under them. The page re-renders as it is.
+
+  for (const w of writes) {
+    await changeEpisodeStatus(user, episodeId, w.dimension, w.value, reason);
+  }
+  revalidatePath(`/episodes/${episodeId}`);
+  revalidatePath("/pipeline");
+  revalidatePath("/vehicles");
   revalidatePath("/dashboard");
 }

@@ -2,49 +2,40 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/current-user";
-import { requirePermission } from "@/lib/authz/engine";
+import { hasPermission, requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
 import { episodeWhereForUser } from "@/modules/episodes/service";
-import { displayStage, STAGE_ORDER, type DisplayStage } from "@/modules/episodes/stage";
+import {
+  BOARD_BLURB,
+  BOARD_BORDER,
+  BOARD_COLUMNS,
+  BOARD_DOT,
+  boardStage,
+  type BoardStage,
+} from "@/modules/episodes/board";
 import { vehicleLabel } from "@/modules/vehicles/service";
+import { StageMove } from "@/components/stage-move";
 import { EmptyState, PageHeader } from "@/components/ui";
-
-/** Tailwind can only see literal class names, so the stage's badge tone is
- * mapped to a matching literal dot color here rather than built dynamically. */
-const STAGE_DOT: Record<DisplayStage, string> = {
-  Expected: "bg-slate-400",
-  Intake: "bg-cyan-400",
-  Reconditioning: "bg-orange-400",
-  Media: "bg-violet-400",
-  "Ready to List": "bg-indigo-400",
-  Listed: "bg-blue-400",
-  "Deal in Progress": "bg-amber-400",
-  Closing: "bg-brand-600",
-  "Delivered / Settling": "bg-teal-400",
-  Closed: "bg-green-400",
-  Inactive: "bg-stone-400",
-};
-
-const STAGE_BORDER: Record<DisplayStage, string> = {
-  Expected: "border-l-slate-400",
-  Intake: "border-l-cyan-400",
-  Reconditioning: "border-l-orange-400",
-  Media: "border-l-violet-400",
-  "Ready to List": "border-l-indigo-400",
-  Listed: "border-l-blue-400",
-  "Deal in Progress": "border-l-amber-400",
-  Closing: "border-l-brand-600",
-  "Delivered / Settling": "border-l-teal-400",
-  Closed: "border-l-green-400",
-  Inactive: "border-l-stone-400",
-};
 
 export const metadata: Metadata = { title: "Pipeline" };
 
+/**
+ * Six columns, and one button per card that says where the car goes next.
+ *
+ * The board used to draw eleven computed stages and offer no way to move
+ * anything — every move meant opening the vehicle and setting the right one of
+ * six status dropdowns, with nothing on screen saying which. See
+ * `src/modules/episodes/board.ts` for what each button writes.
+ *
+ * Columns render even when empty, because an empty column is information ("no
+ * cars waiting on photos") and a board that changes shape as cars move is
+ * harder to read than one that stays still.
+ */
 export default async function PipelinePage() {
   const user = await getSessionUser();
   if (!user) redirect("/login?expired=1");
   requirePermission(user, "view", "episodes");
+  const canEdit = hasPermission(user, "episodes", "edit");
 
   const episodes = await db.inventoryEpisode.findMany({
     where: { AND: [episodeWhereForUser(user), { active: true }] },
@@ -52,54 +43,82 @@ export default async function PipelinePage() {
     orderBy: { createdAt: "asc" },
   });
 
-  const byStage = new Map<DisplayStage, typeof episodes>();
+  const byStage = new Map<BoardStage, typeof episodes>();
+  for (const s of BOARD_COLUMNS) byStage.set(s, []);
   for (const e of episodes) {
-    const stage = displayStage(e);
-    if (!byStage.has(stage)) byStage.set(stage, []);
-    byStage.get(stage)!.push(e);
+    const stage = boardStage(e);
+    if (byStage.has(stage)) byStage.get(stage)!.push(e);
   }
-  const stages = STAGE_ORDER.filter((s) => s !== "Closed" && s !== "Inactive" && byStage.has(s));
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto max-w-[100rem]">
       <PageHeader
         title="Pipeline"
-        subtitle="Active inventory grouped by computed stage. Each vehicle's six status dimensions are on its episode page."
+        subtitle="Where every car is right now. The button on a card moves it to the next step."
       />
       {episodes.length === 0 ? (
-        <EmptyState title="No active inventory" hint="Vehicles appear here from acceptance through financial close." />
+        <EmptyState
+          title="No active inventory"
+          hint="Vehicles appear here from acceptance through financial close."
+        />
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {stages.map((stage) => (
-            <section key={stage} className="w-72 shrink-0">
-              <h2 className="mb-2 flex items-center justify-between rounded-md bg-white px-2.5 py-2 text-sm font-semibold text-stone-700 shadow-sm">
-                <span className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${STAGE_DOT[stage]}`} aria-hidden="true" />
-                  {stage}
-                </span>
-                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
-                  {byStage.get(stage)!.length}
-                </span>
-              </h2>
-              <div className="space-y-2">
-                {byStage.get(stage)!.map((e) => (
-                  <Link
-                    key={e.id}
-                    href={`/episodes/${e.id}`}
-                    className={`block rounded-lg border border-stone-200 border-l-4 bg-white p-3 shadow-sm transition-shadow hover:shadow-md ${STAGE_BORDER[stage]}`}
-                  >
-                    <p className="text-sm font-medium text-stone-900">{vehicleLabel(e.vehicle)}</p>
-                    <p className="mt-0.5 text-xs text-stone-500">
-                      {e.stockNumber} · {e.dealType === "CONSIGNMENT" ? "Consignment" : "Dealer-owned"}
-                    </p>
-                    {e.askingPrice ? (
-                      <p className="mt-1 text-xs font-medium text-stone-700">${Number(e.askingPrice).toLocaleString()}</p>
-                    ) : null}
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ))}
+        /* A wrapping grid, NOT a scrolling row of six columns. Six kanban
+         * columns need ~1600px; a laptop behind the 256px sidebar has ~1100,
+         * so a single row would put the last two stages off-screen — the exact
+         * "spreads outside the viewable area" complaint this app already fixed
+         * once for tables. Wrapping reads Expected → Delivered left-to-right,
+         * then top-to-bottom, and never scrolls sideways at any width. */
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {BOARD_COLUMNS.map((stage) => {
+            const cars = byStage.get(stage)!;
+            return (
+              <section key={stage}>
+                <div className="mb-2 rounded-md bg-white px-3 py-2 shadow-sm">
+                  <h2 className="flex items-center justify-between text-sm font-semibold text-stone-700">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={`h-2.5 w-2.5 shrink-0 rounded-full ${BOARD_DOT[stage]}`}
+                        aria-hidden="true"
+                      />
+                      {stage}
+                    </span>
+                    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+                      {cars.length}
+                    </span>
+                  </h2>
+                  <p className="mt-0.5 text-xs text-stone-500">{BOARD_BLURB[stage]}</p>
+                </div>
+
+                {cars.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-stone-300 px-3 py-4 text-center text-xs text-stone-400">
+                    Nothing here
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {cars.map((e) => (
+                      <div
+                        key={e.id}
+                        className={`rounded-lg border border-stone-200 border-l-4 bg-white p-3 shadow-sm ${BOARD_BORDER[stage]}`}
+                      >
+                        <Link href={`/episodes/${e.id}`} className="block hover:underline">
+                          <p className="text-sm font-medium text-stone-900">{vehicleLabel(e.vehicle)}</p>
+                        </Link>
+                        <p className="mt-0.5 text-xs text-stone-500">
+                          {e.stockNumber} · {e.dealType === "CONSIGNMENT" ? "Consignment" : "Dealer-owned"}
+                        </p>
+                        {e.askingPrice ? (
+                          <p className="mt-1 text-xs font-medium text-stone-700">
+                            ${Number(e.askingPrice).toLocaleString()}
+                          </p>
+                        ) : null}
+                        <StageMove episode={e} episodeId={e.id} canEdit={canEdit} compact />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       )}
     </div>

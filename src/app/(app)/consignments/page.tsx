@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/current-user";
 import { canViewField, requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
-import { displayStage } from "@/modules/episodes/stage";
+import { boardStage } from "@/modules/episodes/board";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 
@@ -50,7 +50,7 @@ export default async function ConsignmentsPage() {
                     </Link>
                     <p className="text-xs text-stone-500">
                       {canSeeSellers && arr?.sellerPartyId ? `Consignor: ${consignorById.get(arr.sellerPartyId) ?? "—"} · ` : ""}
-                      Stage: {displayStage(e)}
+                      Stage: {boardStage(e)}
                       {arr?.agreementExpiresAt ? ` · agreement expires ${new Date(arr.agreementExpiresAt).toLocaleDateString()}` : ""}
                     </p>
                     {canSeeTerms && arr ? (

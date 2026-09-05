@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/auth/current-user";
 import { canViewField, requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
 import { computeProfitability } from "@/modules/finance/service";
-import { displayStage } from "@/modules/episodes/stage";
+import { boardStage } from "@/modules/episodes/board";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { DataTable, type Column } from "@/components/data-table";
@@ -64,7 +64,7 @@ export default async function ReportsPage() {
 
   const stageCounts = new Map<string, number>();
   for (const e of active) {
-    const s = displayStage(e);
+    const s = boardStage(e);
     stageCounts.set(s, (stageCounts.get(s) ?? 0) + 1);
   }
 
@@ -89,7 +89,7 @@ export default async function ReportsPage() {
         <span className={days > 90 ? "font-semibold text-red-700" : "text-stone-900"}>{days} days</span>
       ),
     },
-    { key: "stage", header: "Stage", className: "text-stone-600", cell: ({ e }) => displayStage(e) },
+    { key: "stage", header: "Stage", className: "text-stone-600", cell: ({ e }) => boardStage(e) },
     {
       key: "asking",
       header: "Asking",

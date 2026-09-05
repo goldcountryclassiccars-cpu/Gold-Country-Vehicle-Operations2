@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/auth/current-user";
 import { hasPermission, requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
 import { vehicleWhereForUser, vehicleLabel } from "@/modules/vehicles/service";
-import { displayStage, STAGE_TONE } from "@/modules/episodes/stage";
+import { BOARD_TONE, boardStage } from "@/modules/episodes/board";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 import { DataTable, type Column } from "@/components/data-table";
 
@@ -63,7 +63,7 @@ export default async function VehiclesPage({
       phone: "meta",
       cell: (v) => {
         const ep = v.episodes[0];
-        return ep ? <Badge tone={STAGE_TONE[displayStage(ep)]}>{displayStage(ep)}</Badge> : "—";
+        return ep ? <Badge tone={BOARD_TONE[boardStage(ep)]}>{boardStage(ep)}</Badge> : "—";
       },
     },
     { key: "vin", header: "VIN", className: "text-stone-600", cell: (v) => v.identifiers[0]?.value ?? "—" },
