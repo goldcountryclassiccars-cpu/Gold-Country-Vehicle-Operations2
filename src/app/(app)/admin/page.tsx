@@ -12,6 +12,7 @@ import {
   updateSettingsAction,
 } from "@/modules/admin/actions";
 import { Badge, Card, PageHeader, inputClass } from "@/components/ui";
+import { DataTable, type Column } from "@/components/data-table";
 
 export const metadata: Metadata = { title: "Administration" };
 
@@ -32,6 +33,63 @@ export default async function AdminPage() {
   ]);
   const stock = { prefix: "GC", nextNumber: 1001, ...((stockSetting?.value as object) ?? {}) } as { prefix: string; nextNumber: number };
   const settlementDays = typeof settlementSetting?.value === "number" ? settlementSetting.value : 14;
+
+  const userColumns: Column<(typeof users)[number]>[] = [
+    { key: "name", header: "Name", phone: "title", className: "font-medium text-stone-900", cell: (u) => u.name },
+    {
+      key: "status",
+      header: "Status",
+      phone: "meta",
+      cell: (u) => <Badge tone={u.active ? "green" : "red"}>{u.active ? "active" : "disabled"}</Badge>,
+    },
+    { key: "email", header: "Email", className: "text-stone-600", cell: (u) => u.email },
+    {
+      key: "roles",
+      header: "Roles",
+      className: "text-stone-600",
+      cell: (u) => u.roles.map((r) => r.role.name).join(", ") || "—",
+    },
+    {
+      key: "departments",
+      header: "Departments",
+      className: "text-stone-600",
+      cell: (u) => u.departments.map((d) => d.department.name).join(", ") || "—",
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      cell: (u) =>
+        u.id === user.id ? (
+          <span className="text-xs text-stone-400">you</span>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <form action={toggleUserActiveAction}>
+              <input type="hidden" name="userId" value={u.id} />
+              <button type="submit" className="rounded-md border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50">
+                {u.active ? "Disable" : "Enable"}
+              </button>
+            </form>
+            <form action={resetPasswordAction} className="flex items-center gap-1">
+              <input type="hidden" name="userId" value={u.id} />
+              <label htmlFor={`pw-${u.id}`} className="sr-only">
+                New password for {u.name}
+              </label>
+              <input
+                id={`pw-${u.id}`}
+                name="password"
+                type="password"
+                placeholder="new password"
+                minLength={10}
+                className="w-28 rounded-md border border-stone-300 px-2 py-1 text-xs"
+              />
+              <button type="submit" className="rounded-md border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50">
+                Reset
+              </button>
+            </form>
+          </div>
+        ),
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -56,55 +114,13 @@ export default async function AdminPage() {
       <div className="space-y-6">
         <Card accent="stone">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Users</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
-                <tr>
-                  <th scope="col" className="py-2 pr-4">Name</th>
-                  <th scope="col" className="py-2 pr-4">Email</th>
-                  <th scope="col" className="py-2 pr-4">Roles</th>
-                  <th scope="col" className="py-2 pr-4">Departments</th>
-                  <th scope="col" className="py-2 pr-4">Status</th>
-                  <th scope="col" className="py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {users.map((u) => (
-                  <tr key={u.id}>
-                    <td className="py-2 pr-4 font-medium text-stone-900">{u.name}</td>
-                    <td className="py-2 pr-4 text-stone-600">{u.email}</td>
-                    <td className="py-2 pr-4 text-stone-600">{u.roles.map((r) => r.role.name).join(", ") || "—"}</td>
-                    <td className="py-2 pr-4 text-stone-600">{u.departments.map((d) => d.department.name).join(", ") || "—"}</td>
-                    <td className="py-2 pr-4">
-                      <Badge tone={u.active ? "green" : "red"}>{u.active ? "active" : "disabled"}</Badge>
-                    </td>
-                    <td className="py-2">
-                      {u.id !== user.id ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <form action={toggleUserActiveAction}>
-                            <input type="hidden" name="userId" value={u.id} />
-                            <button type="submit" className="rounded-md border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50">
-                              {u.active ? "Disable" : "Enable"}
-                            </button>
-                          </form>
-                          <form action={resetPasswordAction} className="flex items-center gap-1">
-                            <input type="hidden" name="userId" value={u.id} />
-                            <label htmlFor={`pw-${u.id}`} className="sr-only">New password for {u.name}</label>
-                            <input id={`pw-${u.id}`} name="password" type="password" placeholder="new password" minLength={10} className="w-28 rounded-md border border-stone-300 px-2 py-1 text-xs" />
-                            <button type="submit" className="rounded-md border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50">
-                              Reset
-                            </button>
-                          </form>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-stone-400">you</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            bare
+            caption="User accounts"
+            columns={userColumns}
+            rows={users}
+            rowKey={(u) => u.id}
+          />
 
           <form action={createUserAction} className="mt-4 grid gap-2 border-t border-stone-100 pt-4 sm:grid-cols-6">
             <div>

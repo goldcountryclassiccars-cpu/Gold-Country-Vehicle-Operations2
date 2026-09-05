@@ -8,6 +8,7 @@ import { computeProfitability } from "@/modules/finance/service";
 import { snapshotProfitAction } from "@/modules/finance/actions";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import { DataTable, type Column } from "@/components/data-table";
 
 export const metadata: Metadata = { title: "Profitability" };
 
@@ -42,6 +43,90 @@ export default async function ProfitabilityPage() {
     { expenses: 0, net: 0 },
   );
 
+  type ProfitRow = (typeof rows)[number];
+  const columns: Column<ProfitRow>[] = [
+    {
+      key: "vehicle",
+      header: "Vehicle",
+      phone: "title",
+      cell: ({ episode: e }) => (
+        <>
+          <Link href={`/episodes/${e.id}`} className="font-medium text-brand-700 hover:underline">
+            {e.stockNumber}
+          </Link>
+          <p className="text-xs text-stone-400">{vehicleLabel(e.vehicle)}</p>
+        </>
+      ),
+    },
+    {
+      key: "basis",
+      header: "Basis",
+      phone: "meta",
+      cell: ({ episode: e, p }) =>
+        snapByEp.has(e.id) ? (
+          <Badge tone="green">closed snapshot</Badge>
+        ) : p.revenueIsProjected ? (
+          <Badge tone="amber">projected</Badge>
+        ) : (
+          <form action={snapshotProfitAction}>
+            <input type="hidden" name="episodeId" value={e.id} />
+            <button type="submit" className="rounded-md border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50">
+              Snapshot final
+            </button>
+          </form>
+        ),
+    },
+    {
+      key: "deal",
+      header: "Deal",
+      className: "text-stone-600",
+      cell: ({ episode: e }) => (e.dealType === "CONSIGNMENT" ? "Consignment" : "Owned"),
+    },
+    {
+      key: "revenue",
+      header: "Revenue",
+      className: "text-right text-stone-700",
+      headerClassName: "text-right",
+      cell: ({ p }) => money(p.revenue),
+    },
+    ...(showAcquisition
+      ? [
+          {
+            key: "acquisition",
+            header: "Acquisition",
+            className: "text-right text-stone-700",
+            headerClassName: "text-right",
+            cell: ({ episode: e, p }: ProfitRow) => (e.dealType === "CONSIGNMENT" ? "n/a" : money(p.acquisitionCost)),
+          } satisfies Column<ProfitRow>,
+        ]
+      : []),
+    {
+      key: "dealerShare",
+      header: "Dealer share",
+      className: "text-right text-stone-700",
+      headerClassName: "text-right",
+      cell: ({ p }) => money(p.dealershipRevenue),
+    },
+    {
+      key: "expenses",
+      header: "Expenses",
+      className: "text-right text-stone-700",
+      headerClassName: "text-right",
+      cell: ({ p }) => money(p.dealershipExpenses),
+    },
+    {
+      key: "net",
+      header: "Net",
+      className: "text-right font-semibold",
+      headerClassName: "text-right",
+      cell: ({ p }) => (
+        <span className={p.netProfit != null && p.netProfit < 0 ? "text-red-700" : "text-stone-900"}>
+          {money(p.netProfit)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
@@ -49,62 +134,13 @@ export default async function ProfitabilityPage() {
         subtitle={`Computed live from the expense ledger and arrangements. Projected net across active inventory: ${money(totals.net)} (dealership expenses ${money(totals.expenses)}).`}
       />
 
-      {rows.length === 0 ? (
-        <EmptyState title="No active inventory" />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-stone-200 bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
-              <tr>
-                <th scope="col" className="px-4 py-3">Vehicle</th>
-                <th scope="col" className="px-4 py-3">Deal</th>
-                <th scope="col" className="px-4 py-3 text-right">Revenue</th>
-                {showAcquisition ? <th scope="col" className="px-4 py-3 text-right">Acquisition</th> : null}
-                <th scope="col" className="px-4 py-3 text-right">Dealer share</th>
-                <th scope="col" className="px-4 py-3 text-right">Expenses</th>
-                <th scope="col" className="px-4 py-3 text-right">Net</th>
-                <th scope="col" className="px-4 py-3">Basis</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {rows.map(({ episode: e, p }) => (
-                <tr key={e.id} className="hover:bg-stone-50">
-                  <td className="px-4 py-3">
-                    <Link href={`/episodes/${e.id}`} className="font-medium text-brand-700 hover:underline">
-                      {e.stockNumber}
-                    </Link>
-                    <p className="text-xs text-stone-400">{vehicleLabel(e.vehicle)}</p>
-                  </td>
-                  <td className="px-4 py-3 text-stone-600">{e.dealType === "CONSIGNMENT" ? "Consignment" : "Owned"}</td>
-                  <td className="px-4 py-3 text-right text-stone-700">{money(p.revenue)}</td>
-                  {showAcquisition ? (
-                    <td className="px-4 py-3 text-right text-stone-700">{e.dealType === "CONSIGNMENT" ? "n/a" : money(p.acquisitionCost)}</td>
-                  ) : null}
-                  <td className="px-4 py-3 text-right text-stone-700">{money(p.dealershipRevenue)}</td>
-                  <td className="px-4 py-3 text-right text-stone-700">{money(p.dealershipExpenses)}</td>
-                  <td className={`px-4 py-3 text-right font-semibold ${p.netProfit != null && p.netProfit < 0 ? "text-red-700" : "text-stone-900"}`}>
-                    {money(p.netProfit)}
-                  </td>
-                  <td className="px-4 py-3">
-                    {snapByEp.has(e.id) ? (
-                      <Badge tone="green">closed snapshot</Badge>
-                    ) : p.revenueIsProjected ? (
-                      <Badge tone="amber">projected</Badge>
-                    ) : (
-                      <form action={snapshotProfitAction}>
-                        <input type="hidden" name="episodeId" value={e.id} />
-                        <button type="submit" className="rounded-md border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50">
-                          Snapshot final
-                        </button>
-                      </form>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Profitability by vehicle"
+        columns={columns}
+        rows={rows}
+        rowKey={({ episode }) => episode.id}
+        empty={<EmptyState title="No active inventory" />}
+      />
 
       <Card className="mt-6" accent="green">
         <h2 className="text-sm font-semibold text-stone-900">How these numbers work</h2>

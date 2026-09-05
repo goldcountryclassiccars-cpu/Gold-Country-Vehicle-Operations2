@@ -8,6 +8,7 @@ import { computeProfitability } from "@/modules/finance/service";
 import { displayStage } from "@/modules/episodes/stage";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { DataTable, type Column } from "@/components/data-table";
 
 export const metadata: Metadata = { title: "Reports" };
 
@@ -66,6 +67,37 @@ export default async function ReportsPage() {
     const s = displayStage(e);
     stageCounts.set(s, (stageCounts.get(s) ?? 0) + 1);
   }
+
+  const agingColumns: Column<(typeof aging)[number]>[] = [
+    {
+      key: "vehicle",
+      header: "Vehicle",
+      phone: "title",
+      cell: ({ e }) => (
+        <Link href={`/episodes/${e.id}`} className="text-brand-700 hover:underline">
+          {e.stockNumber} — {vehicleLabel(e.vehicle)}
+        </Link>
+      ),
+    },
+    {
+      key: "days",
+      header: "Days",
+      phone: "meta",
+      className: "text-right tabular-nums",
+      headerClassName: "text-right",
+      cell: ({ days }) => (
+        <span className={days > 90 ? "font-semibold text-red-700" : "text-stone-900"}>{days} days</span>
+      ),
+    },
+    { key: "stage", header: "Stage", className: "text-stone-600", cell: ({ e }) => displayStage(e) },
+    {
+      key: "asking",
+      header: "Asking",
+      className: "text-right text-stone-700",
+      headerClassName: "text-right",
+      cell: ({ e }) => (e.askingPrice ? money(Number(e.askingPrice)) : "—"),
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -135,36 +167,19 @@ export default async function ReportsPage() {
       <Card>
         <h2 className="text-base font-semibold text-stone-900">Inventory aging</h2>
         <p className="mt-0.5 text-xs text-stone-500">Days since acceptance, oldest first. Long-aged vehicles may need a price review.</p>
-        {aging.length === 0 ? (
-          <div className="mt-3"><EmptyState title="No active inventory" /></div>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
-                <tr>
-                  <th scope="col" className="py-2 pr-4">Vehicle</th>
-                  <th scope="col" className="py-2 pr-4">Stage</th>
-                  <th scope="col" className="py-2 pr-4 text-right">Asking</th>
-                  <th scope="col" className="py-2 text-right">Days</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {aging.map(({ e, days }) => (
-                  <tr key={e.id}>
-                    <td className="py-2 pr-4">
-                      <Link href={`/episodes/${e.id}`} className="text-brand-700 hover:underline">
-                        {e.stockNumber} — {vehicleLabel(e.vehicle)}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-4 text-stone-600">{displayStage(e)}</td>
-                    <td className="py-2 pr-4 text-right text-stone-700">{e.askingPrice ? money(Number(e.askingPrice)) : "—"}</td>
-                    <td className={`py-2 text-right tabular-nums ${days > 90 ? "font-semibold text-red-700" : "text-stone-900"}`}>{days}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          bare
+          className="mt-3"
+          caption="Inventory aging, oldest first"
+          columns={agingColumns}
+          rows={aging}
+          rowKey={({ e }) => e.id}
+          empty={
+            <div className="mt-3">
+              <EmptyState title="No active inventory" />
+            </div>
+          }
+        />
       </Card>
     </div>
   );

@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { DataTable, type Column } from "@/components/data-table";
 
 export const metadata: Metadata = { title: "Audit log" };
 
@@ -27,6 +28,37 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
     take: 100,
   });
 
+  const columns: Column<(typeof events)[number]>[] = [
+    {
+      key: "action",
+      header: "Action",
+      phone: "title",
+      className: "font-mono text-xs text-stone-800",
+      cell: (e) => e.action,
+    },
+    {
+      key: "when",
+      header: "When",
+      className: "whitespace-nowrap text-xs text-stone-500",
+      cell: (e) => new Date(e.createdAt).toLocaleString(),
+    },
+    { key: "actor", header: "Actor", className: "text-stone-900", cell: (e) => e.actorName },
+    {
+      key: "roles",
+      header: "Acting roles",
+      className: "text-xs text-stone-500",
+      cell: (e) => e.actingRoles || "—",
+    },
+    {
+      key: "resource",
+      header: "Resource",
+      className: "text-xs text-stone-500",
+      cell: (e) =>
+        e.resourceType ? `${e.resourceType}${e.resourceId ? ` · ${e.resourceId.slice(0, 8)}…` : ""}` : "—",
+    },
+    { key: "reason", header: "Reason", className: "text-xs text-stone-600", cell: (e) => e.reason ?? "—" },
+  ];
+
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader title="Audit log" subtitle="Append-only record of every significant action, actor, and change." />
@@ -43,38 +75,13 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         />
       </form>
 
-      {events.length === 0 ? (
-        <EmptyState title="No matching audit events" />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-stone-200 bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
-              <tr>
-                <th scope="col" className="px-4 py-3">When</th>
-                <th scope="col" className="px-4 py-3">Actor</th>
-                <th scope="col" className="px-4 py-3">Acting roles</th>
-                <th scope="col" className="px-4 py-3">Action</th>
-                <th scope="col" className="px-4 py-3">Resource</th>
-                <th scope="col" className="px-4 py-3">Reason</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {events.map((e) => (
-                <tr key={e.id} className="align-top">
-                  <td className="whitespace-nowrap px-4 py-2 text-xs text-stone-500">{new Date(e.createdAt).toLocaleString()}</td>
-                  <td className="px-4 py-2 text-stone-900">{e.actorName}</td>
-                  <td className="px-4 py-2 text-xs text-stone-500">{e.actingRoles || "—"}</td>
-                  <td className="px-4 py-2 font-mono text-xs text-stone-800">{e.action}</td>
-                  <td className="px-4 py-2 text-xs text-stone-500">
-                    {e.resourceType ? `${e.resourceType}${e.resourceId ? ` · ${e.resourceId.slice(0, 8)}…` : ""}` : "—"}
-                  </td>
-                  <td className="px-4 py-2 text-xs text-stone-600">{e.reason ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Audit events"
+        columns={columns}
+        rows={events}
+        rowKey={(e) => e.id}
+        empty={<EmptyState title="No matching audit events" />}
+      />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { vehicleWhereForUser, vehicleLabel } from "@/modules/vehicles/service";
 import { displayStage, STAGE_TONE } from "@/modules/episodes/stage";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
+import { DataTable, type Column } from "@/components/data-table";
 
 export const metadata: Metadata = { title: "Vehicles" };
 
@@ -45,6 +46,62 @@ export default async function VehiclesPage({
     take: 100,
   });
 
+  const columns: Column<(typeof vehicles)[number]>[] = [
+    {
+      key: "vehicle",
+      header: "Vehicle",
+      phone: "title",
+      cell: (v) => (
+        <Link href={`/vehicles/${v.id}`} className="font-medium text-brand-700 hover:underline">
+          {vehicleLabel(v)}
+        </Link>
+      ),
+    },
+    {
+      key: "stage",
+      header: "Stage",
+      phone: "meta",
+      cell: (v) => {
+        const ep = v.episodes[0];
+        return ep ? <Badge tone={STAGE_TONE[displayStage(ep)]}>{displayStage(ep)}</Badge> : "—";
+      },
+    },
+    { key: "vin", header: "VIN", className: "text-stone-600", cell: (v) => v.identifiers[0]?.value ?? "—" },
+    {
+      key: "stock",
+      header: "Stock #",
+      cell: (v) => {
+        const ep = v.episodes[0];
+        return ep ? (
+          <Link href={`/episodes/${ep.id}`} className="text-brand-700 hover:underline">
+            {ep.stockNumber}
+          </Link>
+        ) : (
+          "—"
+        );
+      },
+    },
+    {
+      key: "dealType",
+      header: "Deal type",
+      className: "text-stone-600",
+      cell: (v) => {
+        const ep = v.episodes[0];
+        if (!ep) return "—";
+        return ep.dealType === "CONSIGNMENT" ? "Consignment" : ep.dealType === "DEALER_PURCHASE" ? "Dealer-owned" : ep.dealType;
+      },
+    },
+    {
+      key: "asking",
+      header: "Asking",
+      className: "text-stone-700",
+      cell: (v) => {
+        const ep = v.episodes[0];
+        return ep?.askingPrice ? `$${Number(ep.askingPrice).toLocaleString()}` : "—";
+      },
+    },
+  ];
+
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
@@ -76,55 +133,18 @@ export default async function VehiclesPage({
         />
       </form>
 
-      {vehicles.length === 0 ? (
-        <EmptyState title="No vehicles found" hint={q ? "Try a different search." : "Add your first vehicle to get started."} />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-stone-200 bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
-              <tr>
-                <th scope="col" className="px-4 py-3">Vehicle</th>
-                <th scope="col" className="px-4 py-3">VIN</th>
-                <th scope="col" className="px-4 py-3">Stock #</th>
-                <th scope="col" className="px-4 py-3">Deal type</th>
-                <th scope="col" className="px-4 py-3">Stage</th>
-                <th scope="col" className="px-4 py-3">Asking</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {vehicles.map((v) => {
-                const ep = v.episodes[0];
-                return (
-                  <tr key={v.id} className="hover:bg-stone-50">
-                    <td className="px-4 py-3">
-                      <Link href={`/vehicles/${v.id}`} className="font-medium text-brand-700 hover:underline">
-                        {vehicleLabel(v)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-stone-600">{v.identifiers[0]?.value ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      {ep ? (
-                        <Link href={`/episodes/${ep.id}`} className="text-brand-700 hover:underline">
-                          {ep.stockNumber}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-stone-600">
-                      {ep ? (ep.dealType === "CONSIGNMENT" ? "Consignment" : ep.dealType === "DEALER_PURCHASE" ? "Dealer-owned" : ep.dealType) : "—"}
-                    </td>
-                    <td className="px-4 py-3">{ep ? <Badge tone={STAGE_TONE[displayStage(ep)]}>{displayStage(ep)}</Badge> : "—"}</td>
-                    <td className="px-4 py-3 text-stone-700">
-                      {ep?.askingPrice ? `$${Number(ep.askingPrice).toLocaleString()}` : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Vehicles in inventory"
+        columns={columns}
+        rows={vehicles}
+        rowKey={(v) => v.id}
+        empty={
+          <EmptyState
+            title="No vehicles found"
+            hint={q ? "Try a different search." : "Add your first vehicle to get started."}
+          />
+        }
+      />
     </div>
   );
 }
