@@ -45,3 +45,20 @@ export function storeDay(day: string | Date): Date {
 export function readDay(value: Date | null | undefined): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
+
+const TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: DEALERSHIP_TIME_ZONE,
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/**
+ * A real instant (a note, a status change) shown as dealership wall-clock
+ * time: "Sep 5, 3:12 PM". Server-rendered pages run in UTC, so formatting
+ * without the timezone would show shop-floor notes seven hours in the future.
+ */
+export function dealershipTimeString(instant: Date): string {
+  return TIME_FORMAT.format(instant);
+}

@@ -121,6 +121,38 @@ export async function addComment(
   return comment;
 }
 
+/**
+ * A note on a task. "Done" is rarely the whole story — this is how staff say
+ * what was actually done, what's left, or why something is stuck. The task's
+ * creator and assignee are notified (minus the author), because on the shared
+ * shop iPad the signed-in account is often neither of them.
+ */
+export async function addTaskNote(user: SessionUser, taskId: string, body: string) {
+  const task = await db.task.findUniqueOrThrow({ where: { id: taskId } });
+  // A vendor account only ever writes vendor-visible notes (same rule as addCommentAction).
+  const isVendorOnly = user.roleKeys.length === 1 && user.roleKeys[0] === "vendor";
+  const comment = await addComment(user, { taskId }, body, isVendorOnly ? "VENDOR_VISIBLE" : "INTERNAL");
+  const recipients = [task.createdById, task.assigneeId].filter(
+    (id): id is string => !!id && id !== user.id,
+  );
+  if (recipients.length) {
+    const { notifyUsers } = await import("@/modules/notifications/service");
+    await notifyUsers(recipients, {
+      title: `Note on task: ${task.title}`,
+      body: body.length > 140 ? `${body.slice(0, 140)}…` : body,
+      href: "/my-work",
+    }).catch(() => {});
+  }
+  return comment;
+}
+
+/** Complete a task and say what was done in the same stroke. */
+export async function completeTaskWithNote(user: SessionUser, taskId: string, note?: string | null) {
+  const trimmed = note?.trim();
+  if (trimmed) await addTaskNote(user, taskId, trimmed);
+  return setTaskStatus(user, taskId, "DONE");
+}
+
 /** Vendors only ever see VENDOR_VISIBLE comments. */
 export function commentVisibilityFilter(user: SessionUser): Prisma.CommentWhereInput {
   const isVendorOnly = user.roleKeys.length === 1 && user.roleKeys[0] === "vendor";

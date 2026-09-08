@@ -8,6 +8,8 @@ import { db } from "@/lib/db";
 import {
   addComment,
   addFinding,
+  addTaskNote,
+  completeTaskWithNote,
   completeInspection,
   createInspection,
   createTask,
@@ -64,6 +66,39 @@ export async function setTaskStatusAction(formData: FormData) {
   const action = parsed.data.status === "DONE" ? "complete" : parsed.data.status === "OPEN" ? "reopen" : "edit";
   requirePermission(user, action, "tasks", await workflowRecordContext(task));
   await setTaskStatus(user, parsed.data.taskId, parsed.data.status);
+  revalidateWorkflow(task.episodeId);
+}
+
+// ---- Task notes -----------------------------------------------------------
+
+const taskNoteSchema = z.object({
+  taskId: z.string().uuid(),
+  body: z.string().trim().min(1).max(4000),
+});
+
+export async function addTaskNoteAction(formData: FormData) {
+  const user = await getSessionUser();
+  requirePermission(user, "create", "comments");
+  const parsed = taskNoteSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  const task = await db.task.findUniqueOrThrow({ where: { id: parsed.data.taskId } });
+  requirePermission(user, "view", "tasks", await workflowRecordContext(task));
+  await addTaskNote(user, parsed.data.taskId, parsed.data.body);
+  revalidateWorkflow(task.episodeId);
+}
+
+/** One stroke: save the note (if any) and mark the task done. */
+export async function completeTaskWithNoteAction(formData: FormData) {
+  const user = await getSessionUser();
+  const parsed = taskNoteSchema
+    .extend({ body: z.string().trim().max(4000).optional() })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  const task = await db.task.findUniqueOrThrow({ where: { id: parsed.data.taskId } });
+  const ctx = await workflowRecordContext(task);
+  requirePermission(user, "complete", "tasks", ctx);
+  if (parsed.data.body) requirePermission(user, "create", "comments");
+  await completeTaskWithNote(user, parsed.data.taskId, parsed.data.body);
   revalidateWorkflow(task.episodeId);
 }
 

@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { markAllReadAction, markReadAction } from "@/modules/notifications/actions";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { dealershipTimeString } from "@/lib/dealership-date";
 
 export const metadata: Metadata = { title: "Notifications" };
 
@@ -47,7 +48,7 @@ export default async function NotificationsPage() {
               <div>
                 <p className="text-sm font-medium text-stone-900">{n.title}</p>
                 {n.body ? <p className="text-sm text-stone-600">{n.body}</p> : null}
-                <p className="mt-1 text-xs text-stone-400">{new Date(n.createdAt).toLocaleString()}</p>
+                <p className="mt-1 text-xs text-stone-400">{dealershipTimeString(new Date(n.createdAt))}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {n.href ? (
