@@ -231,6 +231,12 @@ export default async function AdminPage() {
             Which documents a sale needs is decided by <code>prisma/document-registry.json</code>. Editing that file and
             deploying is how a rule changes — no code change, and the seed re-runs on every deploy.
           </p>
+          <Link
+            href="/admin/documents"
+            className="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline"
+          >
+            Sale document setup — what is still needed, and load approved templates →
+          </Link>
         </Card>
 
         <Card>

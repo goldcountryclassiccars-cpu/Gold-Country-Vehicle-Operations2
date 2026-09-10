@@ -16,6 +16,7 @@ import {
   reevaluateSaleAction,
   setRequirementStepAction,
 } from "@/modules/documents/actions";
+import { generateDocumentAction } from "@/modules/sales/actions";
 import type { ComplianceRow, ComplianceSummary } from "@/modules/documents/requirements";
 
 const CATEGORY_LABEL: Record<number, string> = {
@@ -92,12 +93,67 @@ function Worksheet({ row }: { row: ComplianceRow }) {
   );
 }
 
-function RowActions({ row, saleId, canEdit, canOverride }: { row: ComplianceRow; saleId: string; canEdit: boolean; canOverride: boolean }) {
+function RowActions({
+  row,
+  saleId,
+  canEdit,
+  canOverride,
+  canGenerate,
+}: {
+  row: ComplianceRow;
+  saleId: string;
+  canEdit: boolean;
+  canOverride: boolean;
+  canGenerate: boolean;
+}) {
   const next = primaryStep(row);
   const gating = row.state === "REQUIRED" || row.state === "UNKNOWN";
+  // Category 1 is the only kind this app produces. Category 3 documents are
+  // controlled originals and 2 are government forms — printing our own would
+  // be wrong, so those get a worksheet instead.
+  const canProduce = row.category === 1 && canGenerate && gating;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {row.documentFileId ? (
+        <a
+          href={`/api/files/${row.documentFileId}`}
+          target="_blank"
+          className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-semibold shadow-sm hover:bg-stone-50"
+        >
+          Open document
+        </a>
+      ) : null}
+
+      {canProduce ? (
+        <form action={generateDocumentAction}>
+          <input type="hidden" name="saleId" value={saleId} />
+          <input type="hidden" name="templateId" value={row.templateId} />
+          <button className="min-h-11 rounded-lg border border-brand-800 bg-brand-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-800">
+            {row.documentFileId ? "Regenerate" : row.approvedTemplate ? "Produce" : "Produce (demo)"}
+          </button>
+        </form>
+      ) : null}
+
+      {row.category === 4 && gating && canEdit ? (
+        <form
+          action="/api/documents/requirement-upload"
+          method="post"
+          encType="multipart/form-data"
+          className="flex flex-wrap items-center gap-1"
+        >
+          <input type="hidden" name="requirementId" value={row.id} />
+          <input type="hidden" name="saleId" value={saleId} />
+          <label htmlFor={`up-${row.id}`} className="sr-only">
+            Attach the {row.name}
+          </label>
+          <input id={`up-${row.id}`} type="file" name="file" required className="max-w-[11rem] text-xs" />
+          <button className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-semibold shadow-sm hover:bg-stone-50">
+            Attach
+          </button>
+        </form>
+      ) : null}
+
       {gating && next && canEdit ? (
         <form action={setRequirementStepAction}>
           <input type="hidden" name="requirementId" value={row.id} />
@@ -152,12 +208,14 @@ function CategoryTable({
   saleId,
   canEdit,
   canOverride,
+  canGenerate,
 }: {
   category: number;
   rows: ComplianceRow[];
   saleId: string;
   canEdit: boolean;
   canOverride: boolean;
+  canGenerate: boolean;
 }) {
   if (rows.length === 0) return null;
 
@@ -232,7 +290,9 @@ function CategoryTable({
     {
       key: "action",
       header: "Next step",
-      cell: (r) => <RowActions row={r} saleId={saleId} canEdit={canEdit} canOverride={canOverride} />,
+      cell: (r) => (
+        <RowActions row={r} saleId={saleId} canEdit={canEdit} canOverride={canOverride} canGenerate={canGenerate} />
+      ),
     },
   ];
 
@@ -282,11 +342,13 @@ export function DocChecklist({
   summary,
   canEdit,
   canOverride,
+  canGenerate,
 }: {
   saleId: string;
   summary: ComplianceSummary;
   canEdit: boolean;
   canOverride: boolean;
+  canGenerate: boolean;
 }) {
   if (summary.rows.length === 0) {
     return (
@@ -328,8 +390,11 @@ export function DocChecklist({
       </div>
 
       <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-        Tracking only. Generated PDFs stay watermarked DEMONSTRATION until approved templates are loaded per
-        SALES_DOCUMENT_SETUP.md, and the rules themselves are not legal advice.
+        Documents without an approved copy loaded generate a DEMONSTRATION watermark, and these rules are a starting
+        point for your compliance resource rather than legal advice.{" "}
+        <a href="/admin/documents" className="font-medium underline">
+          Document setup
+        </a>
       </p>
 
       {[1, 2, 3, 4].map((category) => (
@@ -340,6 +405,7 @@ export function DocChecklist({
           saleId={saleId}
           canEdit={canEdit}
           canOverride={canOverride}
+          canGenerate={canGenerate}
         />
       ))}
     </div>

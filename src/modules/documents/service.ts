@@ -65,7 +65,17 @@ async function renderDemoPdf(input: {
   return Buffer.from(await pdf.save());
 }
 
-/** Generates (or re-generates as a new version) a document for a sale. */
+/**
+ * Generates (or re-generates as a new version) a document for a sale.
+ *
+ * If the dealership has loaded its own approved file for this template, that
+ * file is what the buyer gets — no watermark, no text drafted by this app. The
+ * approved blank is copied per sale rather than shared, so a later phase can
+ * fill it in without touching the master.
+ *
+ * With no approved file it falls back to the DEMONSTRATION stand-in, which
+ * exists to exercise the workflow and is labelled as such on its face.
+ */
 export async function generateDocument(user: SessionUser, saleId: string, templateId: string) {
   const sale = await db.saleTransaction.findUniqueOrThrow({ where: { id: saleId } });
   const [template, episode, buyer] = await Promise.all([
@@ -77,29 +87,36 @@ export async function generateDocument(user: SessionUser, saleId: string, templa
     throw new DocumentError("Template does not apply to this deal type");
   }
 
-  const pdfData = await renderDemoPdf({
-    templateName: template.name,
-    stockNumber: episode.stockNumber,
-    vehicle: vehicleLabel(episode.vehicle),
-    buyerName: buyer.displayName,
-    agreedPrice: Number(sale.agreedPrice),
-    dealType: episode.dealType,
-  });
+  const approved = template.approvedFileId
+    ? await db.fileObject.findUnique({ where: { id: template.approvedFileId } })
+    : null;
+
+  const data: Buffer = approved
+    ? await storage().get(approved.storageKey)
+    : await renderDemoPdf({
+        templateName: template.name,
+        stockNumber: episode.stockNumber,
+        vehicle: vehicleLabel(episode.vehicle),
+        buyerName: buyer.displayName,
+        agreedPrice: Number(sale.agreedPrice),
+        dealType: episode.dealType,
+      });
 
   const prior = await db.documentInstance.findFirst({
     where: { saleId, templateId },
     orderBy: { version: "desc" },
   });
   const version = (prior?.version ?? 0) + 1;
-  const storageKey = `documents/${sale.episodeId}/${template.key}-v${version}.pdf`;
-  await storage().put(storageKey, pdfData);
+  const extension = approved ? (approved.contentType === "application/pdf" ? "pdf" : "docx") : "pdf";
+  const storageKey = `documents/${sale.episodeId}/${template.key}-v${version}.${extension}`;
+  await storage().put(storageKey, data);
   const file = await db.fileObject.create({
     data: {
       storageKey,
       adapter: config().STORAGE_ADAPTER,
-      originalName: `${template.key}-v${version}.pdf`,
-      contentType: "application/pdf",
-      sizeBytes: pdfData.length,
+      originalName: `${template.key}-v${version}.${extension}`,
+      contentType: approved?.contentType ?? "application/pdf",
+      sizeBytes: data.length,
       uploadedBy: user.id,
       sensitivity: "signed_docs",
     },
@@ -121,8 +138,17 @@ export async function generateDocument(user: SessionUser, saleId: string, templa
     action: "document.generate",
     resourceType: "document",
     resourceId: instance.id,
-    newValues: { template: template.key, version, saleId },
+    newValues: { template: template.key, version, saleId, approved: Boolean(approved) },
   });
+
+  // Point the compliance checklist row at what was just produced, so the row
+  // can open it. Without this the document exists but the checklist has no way
+  // to reach it, which is what made the documents feel inaccessible.
+  await db.saleDocumentRequirement.updateMany({
+    where: { saleId, templateId },
+    data: { documentInstanceId: instance.id, prefillAvailable: true, readyForSignature: true },
+  });
+
   return instance;
 }
 

@@ -219,6 +219,10 @@ export interface ComplianceRow {
   retain: boolean;
   submitTo: string | null;
   progress: CompletionProgress;
+  /** FileObject of the document produced for this row, when one exists. */
+  documentFileId: string | null;
+  /** True when the dealership's own approved copy backs this template. */
+  approvedTemplate: boolean;
 }
 
 export interface ComplianceSummary {
@@ -239,6 +243,16 @@ export async function saleComplianceSummary(saleId: string): Promise<ComplianceS
     include: { template: true },
     orderBy: [{ template: { sortOrder: "asc" } }],
   });
+
+  // One lookup for every produced document rather than one per row.
+  const instanceIds = rows.map((r) => r.documentInstanceId).filter((id): id is string => Boolean(id));
+  const instances = instanceIds.length
+    ? await db.documentInstance.findMany({
+        where: { id: { in: instanceIds } },
+        select: { id: true, fileId: true },
+      })
+    : [];
+  const fileByInstance = new Map(instances.map((i) => [i.id, i.fileId]));
 
   const mapped: ComplianceRow[] = rows.map((r) => {
     const progress: CompletionProgress = {
@@ -278,6 +292,8 @@ export async function saleComplianceSummary(saleId: string): Promise<ComplianceS
       retain: r.template.retain,
       submitTo: r.template.submitTo,
       progress,
+      documentFileId: r.documentInstanceId ? (fileByInstance.get(r.documentInstanceId) ?? null) : r.fileId,
+      approvedTemplate: Boolean(r.template.approvedFileId),
     };
   });
 

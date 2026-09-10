@@ -340,6 +340,7 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
           summary={compliance}
           canEdit={canEditDocs && open}
           canOverride={canOverrideDocs && open}
+          canGenerate={canGenDocs && open}
         />
       </section>
     </div>

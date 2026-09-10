@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/current-user";
-import { getScope, requirePermission } from "@/lib/authz/engine";
+import { getScope, hasPermission, requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import { documentSetupState } from "@/modules/documents/setup";
 
 export const metadata: Metadata = { title: "Documents" };
 
@@ -15,6 +16,9 @@ export default async function DocumentsPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login?expired=1");
   requirePermission(user, "view", "documents");
+
+  const canManage = hasPermission(user, "admin", "manage_config");
+  const setup = await documentSetupState();
 
   const scope = getScope(user, "documents", "view");
   const docs = await db.documentInstance.findMany({
@@ -36,12 +40,33 @@ export default async function DocumentsPage() {
     <div className="mx-auto max-w-4xl">
       <PageHeader title="Documents" subtitle="Generated sales documents, their versions and signature status." />
 
-      <Card className="mb-6" accent="slate">
-        <p className="text-sm text-amber-900">
-          All documents are <strong>demonstration templates</strong> — watermarked and not legally sufficient. The
-          owner setup checklist in <code className="rounded bg-stone-100 px-1">SALES_DOCUMENT_SETUP.md</code> lists what the
-          dealership must provide before real documents are enabled.
+      <Card className="mb-6" accent={setup.templatesApproved > 0 ? "green" : "amber"}>
+        {setup.templatesApproved === 0 ? (
+          <p className="text-sm text-stone-700">
+            Every document here is a <strong>demonstration template</strong> — watermarked and not legally sufficient.
+            To produce real documents, load your approved copies.
+          </p>
+        ) : (
+          <p className="text-sm text-stone-700">
+            <strong>
+              {setup.templatesApproved} of {setup.templatesTotal} documents
+            </strong>{" "}
+            have an approved copy loaded and generate without a watermark. The rest are still demonstration templates.
+          </p>
+        )}
+        <p className="mt-1 text-sm text-stone-600">
+          {setup.done} of {setup.total} setup items are done.
         </p>
+        {canManage ? (
+          <Link
+            href="/admin/documents"
+            className="mt-2 inline-block text-sm font-medium text-brand-700 hover:underline"
+          >
+            Sale document setup — see what is still needed and load approved templates →
+          </Link>
+        ) : (
+          <p className="mt-2 text-xs text-stone-500">An admin can load approved templates in Administration.</p>
+        )}
       </Card>
 
       {docs.length === 0 ? (

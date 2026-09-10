@@ -180,6 +180,22 @@ model AuditEvent {
 // Application settings (dealership configuration; secrets stay in env vars)
 // ---------------------------------------------------------------------------
 
+/// One line of the sale-document setup checklist that needs a human answer.
+///
+/// Most of the checklist is detected from live data (is the registry loaded?
+/// is the dealer address filled in?). These are the ones only a person can
+/// close: "counsel reviewed this", "we chose this e-signature vendor". Kept as
+/// rows rather than a hardcoded list so the checklist can grow without a
+/// migration.
+model DocumentSetupItem {
+  key          String    @id
+  provided     Boolean   @default(false)
+  note         String?
+  providedById String?
+  providedAt   DateTime?
+  updatedAt    DateTime  @updatedAt
+}
+
 model AppSetting {
   key       String   @id
   value     Json
@@ -1105,6 +1121,18 @@ model DocumentTemplate {
   notes             String?
   /// True until dealer counsel has confirmed the rule and thresholds.
   verifyWithCounsel Boolean        @default(false)
+
+  // --- The dealership's own approved document, uploaded through Administration.
+  //
+  // While this is null the app generates a DEMONSTRATION-watermarked stand-in.
+  // Once an approved file is loaded, that document is served as the real thing
+  // and the watermark stops. Loading it is a deliberate, audited act by an
+  // Admin — it is the moment a document stops being a demo.
+  approvedFileId      String?
+  approvedAt          DateTime?
+  approvedById        String?
+  /// The version or effective date counsel gave, e.g. "CADA rev. 3/2026".
+  approvedVersionNote String?
 
   instances    DocumentInstance[]
   requirements SaleDocumentRequirement[]
