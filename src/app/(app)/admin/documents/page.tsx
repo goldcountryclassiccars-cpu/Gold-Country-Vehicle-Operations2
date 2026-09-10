@@ -17,6 +17,7 @@ import { requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
 import { documentSetupState, type SetupItem } from "@/modules/documents/setup";
 import { setSetupItemAction, clearApprovedTemplateAction } from "@/modules/documents/setup-actions";
+import { dealershipDayString } from "@/lib/dealership-date";
 import { Badge, Card, PageHeader, inputClass, type BadgeTone } from "@/components/ui";
 import { DataTable, type Column } from "@/components/data-table";
 
@@ -119,7 +120,11 @@ function SetupRow({ item }: { item: SetupItem }) {
       ) : null}
 
       {item.providedAt ? (
-        <p className="mt-2 text-xs text-stone-400">Recorded {new Date(item.providedAt).toLocaleDateString()}.</p>
+        <p className="mt-2 text-xs text-stone-400">
+          {/* Dealership wall clock, not the server's UTC — a 4pm entry that
+              reads as the next day is the bug v14 fixed for task notes. */}
+          Recorded {dealershipDayString(new Date(item.providedAt))}.
+        </p>
       ) : null}
     </li>
   );
