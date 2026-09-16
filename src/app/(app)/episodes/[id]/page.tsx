@@ -18,6 +18,7 @@ import {
 } from "@/modules/episodes/actions";
 import { Badge, Card, DescriptionList, PageHeader, inputClass } from "@/components/ui";
 import { intakeReadiness } from "@/modules/documents/intake";
+import { markIntakeOnFileAction, produceIntakeDocumentAction } from "@/modules/documents/actions";
 import { consignorPayoutClock } from "@/modules/settlements/service";
 
 export const metadata: Metadata = { title: "Episode" };
@@ -53,6 +54,7 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
     intakeReadiness(episode.id),
     episode.dealType === "CONSIGNMENT" ? consignorPayoutClock(episode.id) : null,
   ]);
+  const canGenerateDocs = hasPermission(user, "documents", "generate");
 
   const [source, location, history, seller] = await Promise.all([
     episode.acquisitionSourceId
@@ -107,33 +109,101 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
             </Badge>
           </div>
           <ul className="space-y-2">
-            {readiness.items.map((item) => (
-              <li key={item.key} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-stone-200 px-3 py-2">
-                <span className="min-w-0">
-                  <span className="text-sm font-medium text-stone-900">{item.name}</span>
-                  <p className="text-xs text-stone-500">{item.reason}</p>
-                </span>
-                <Badge
-                  tone={
-                    item.trackedOnSale
-                      ? "green"
-                      : item.state === "REQUIRED"
-                        ? "amber"
-                        : item.state === "UNKNOWN"
-                          ? "neutral"
-                          : "neutral"
-                  }
-                >
-                  {item.trackedOnSale
-                    ? "done on the deal"
-                    : item.state === "REQUIRED"
-                      ? "needed"
-                      : item.state === "UNKNOWN"
-                        ? "cannot answer yet"
-                        : "not needed"}
-                </Badge>
-              </li>
-            ))}
+            {readiness.items.map((item) => {
+              const showActions =
+                item.canProduce &&
+                !item.trackedOnSale &&
+                (item.state === "REQUIRED" || item.state === "UNKNOWN" || item.onFile || item.latestFileId != null);
+              return (
+                <li key={item.key} className="rounded-md border border-stone-200 px-3 py-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="text-sm font-medium text-stone-900">{item.name}</span>
+                      <p className="text-xs text-stone-500">{item.reason}</p>
+                    </span>
+                    <Badge
+                      tone={
+                        item.onFile
+                          ? "green"
+                          : item.trackedOnSale
+                            ? "green"
+                            : item.state === "REQUIRED"
+                              ? "amber"
+                              : "neutral"
+                      }
+                    >
+                      {item.onFile
+                        ? "signed copy on file"
+                        : item.trackedOnSale
+                          ? "done on the deal"
+                          : item.state === "REQUIRED"
+                            ? "needed"
+                            : item.state === "UNKNOWN"
+                              ? "cannot answer yet"
+                              : "not needed"}
+                    </Badge>
+                  </div>
+                  {showActions && canGenerateDocs ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-2">
+                      <form action={produceIntakeDocumentAction}>
+                        <input type="hidden" name="episodeId" value={episode.id} />
+                        <input type="hidden" name="templateKey" value={item.key} />
+                        <button
+                          type="submit"
+                          className="min-h-9 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 hover:bg-stone-50"
+                        >
+                          {item.latestFileId
+                            ? "Print a fresh copy"
+                            : item.hasApprovedTemplate
+                              ? "Print (your approved copy)"
+                              : "Print (DEMO stand-in)"}
+                        </button>
+                      </form>
+                      {item.latestFileId ? (
+                        <a
+                          href={`/api/files/${item.latestFileId}`}
+                          target="_blank"
+                          className="min-h-9 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-stone-50"
+                        >
+                          Open {item.onFile ? "the copy on file" : "the printed copy"}
+                        </a>
+                      ) : null}
+                      {!item.onFile ? (
+                        <details className="w-full sm:w-auto">
+                          <summary className="inline-flex min-h-9 cursor-pointer items-center rounded-md px-2 py-1.5 text-xs font-medium text-brand-700 hover:underline">
+                            Signed? Mark it on file
+                          </summary>
+                          <form action={markIntakeOnFileAction} className="mt-2 flex flex-wrap items-center gap-2">
+                            <input type="hidden" name="episodeId" value={episode.id} />
+                            <input type="hidden" name="templateKey" value={item.key} />
+                            <label htmlFor={`scan-${item.key}`} className="sr-only">
+                              Scan or photo of the signed {item.name}
+                            </label>
+                            <input
+                              id={`scan-${item.key}`}
+                              type="file"
+                              name="scan"
+                              accept=".pdf,image/*"
+                              className="max-w-[14rem] text-xs"
+                            />
+                            <button
+                              type="submit"
+                              className="min-h-9 rounded-md bg-brand-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800"
+                            >
+                              Mark on file
+                            </button>
+                            <p className="w-full text-xs text-stone-500">
+                              Attach a scan or photo of the signed copy if you have one — otherwise this marks the
+                              printed copy as signed and filed.
+                            </p>
+                          </form>
+                        </details>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </Card>
       ) : null}

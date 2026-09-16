@@ -166,3 +166,59 @@ export async function completeSaleAction(formData: FormData) {
   const sale = await db.saleTransaction.findUnique({ where: { id: saleId.data }, select: { episodeId: true } });
   revalidateSale(saleId.data, sale?.episodeId);
 }
+
+// ---- Intake documents (vehicle page, no sale yet) ---------------------------
+
+const intakeDocSchema = z.object({
+  episodeId: z.string().uuid(),
+  templateKey: z.string().trim().min(1),
+});
+
+/** Print/produce an intake-timed document (e.g. the consignment agreement). */
+export async function produceIntakeDocumentAction(formData: FormData) {
+  const user = await getSessionUser();
+  requirePermission(user, "generate", "documents");
+  const parsed = intakeDocSchema.safeParse({
+    episodeId: formData.get("episodeId"),
+    templateKey: formData.get("templateKey"),
+  });
+  if (!parsed.success) return;
+  const { produceIntakeDocument, DocumentError } = await import("./service");
+  try {
+    await produceIntakeDocument(user, parsed.data.episodeId, parsed.data.templateKey);
+  } catch (e) {
+    if (e instanceof DocumentError) return;
+    throw e;
+  }
+  revalidatePath(`/episodes/${parsed.data.episodeId}`);
+}
+
+/** Record that the signed intake document is on file (optionally with a scan). */
+export async function markIntakeOnFileAction(formData: FormData) {
+  const user = await getSessionUser();
+  requirePermission(user, "edit", "documents");
+  const parsed = intakeDocSchema.safeParse({
+    episodeId: formData.get("episodeId"),
+    templateKey: formData.get("templateKey"),
+  });
+  if (!parsed.success) return;
+
+  const raw = formData.get("scan");
+  let scan: { originalName: string; contentType: string; data: Buffer } | null = null;
+  if (raw instanceof File && raw.size > 0) {
+    scan = {
+      originalName: raw.name || "signed-copy",
+      contentType: raw.type || "application/octet-stream",
+      data: Buffer.from(await raw.arrayBuffer()),
+    };
+  }
+
+  const { markIntakeDocumentOnFile, DocumentError } = await import("./service");
+  try {
+    await markIntakeDocumentOnFile(user, parsed.data.episodeId, parsed.data.templateKey, scan);
+  } catch (e) {
+    if (e instanceof DocumentError) return;
+    throw e;
+  }
+  revalidatePath(`/episodes/${parsed.data.episodeId}`);
+}

@@ -127,6 +127,16 @@ export async function evaluateSaleRequirements(user: SessionUser | null, saleId:
   const existing = await db.saleDocumentRequirement.findMany({ where: { saleId } });
   const existingByTemplate = new Map(existing.map((r) => [r.templateId, r]));
 
+  // Documents signed and filed at intake (the consignment agreement above all)
+  // carry over — the deal checklist must not ask for them again. Latest filed
+  // episode-level copy per template.
+  const saleRow = await db.saleTransaction.findUniqueOrThrow({ where: { id: saleId }, select: { episodeId: true } });
+  const intakeFiled = await db.documentInstance.findMany({
+    where: { episodeId: saleRow.episodeId, saleId: null, status: { in: ["SIGNED", "FILED"] } },
+    orderBy: { version: "asc" },
+  });
+  const intakeFiledByTemplate = new Map(intakeFiled.map((i) => [i.templateId, i]));
+
   const changes: { key: string; from: string | null; to: RequirementState }[] = [];
 
   for (const result of results) {
@@ -153,10 +163,40 @@ export async function evaluateSaleRequirements(user: SessionUser | null, saleId:
       documentInstanceId: prior?.documentInstanceId ?? null,
     };
 
+    // Adopt the intake-filed copy: the people who sign at intake signed then
+    // (the buyer, if the document lists one, still has not).
+    const intakeInstance =
+      template.timing === "INTAKE" && !progress.documentInstanceId
+        ? intakeFiledByTemplate.get(template.id)
+        : undefined;
+    let adopted: Partial<{
+      documentInstanceId: string;
+      filedAt: Date;
+      dealerSigned: boolean;
+      consignorSigned: boolean;
+      prefillAvailable: boolean;
+      readyForSignature: boolean;
+    }> | null = null;
+    if (intakeInstance) {
+      progress.documentInstanceId = intakeInstance.id;
+      progress.filedAt = intakeInstance.filedAt ?? intakeInstance.createdAt;
+      if (template.signers.includes("DEALER")) progress.dealerSigned = true;
+      if (template.signers.includes("CONSIGNOR")) progress.consignorSigned = true;
+      adopted = {
+        documentInstanceId: progress.documentInstanceId,
+        filedAt: progress.filedAt,
+        dealerSigned: progress.dealerSigned,
+        consignorSigned: progress.consignorSigned,
+        prefillAvailable: true,
+        readyForSignature: true,
+      };
+    }
+
     const data = {
       state: effectiveState,
       reason: result.reason,
       complete: isRequirementComplete(template, progress),
+      ...(adopted ?? {}),
     };
 
     if (!prior) {
@@ -164,7 +204,7 @@ export async function evaluateSaleRequirements(user: SessionUser | null, saleId:
       changes.push({ key: result.key, from: null, to: effectiveState });
       continue;
     }
-    if (prior.state !== data.state || prior.reason !== data.reason || prior.complete !== data.complete) {
+    if (prior.state !== data.state || prior.reason !== data.reason || prior.complete !== data.complete || adopted !== null) {
       await db.saleDocumentRequirement.update({ where: { id: prior.id }, data });
       if (prior.state !== data.state) changes.push({ key: result.key, from: prior.state, to: effectiveState });
     }

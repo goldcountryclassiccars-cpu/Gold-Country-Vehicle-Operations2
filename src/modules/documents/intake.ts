@@ -23,6 +23,15 @@ export interface IntakeReadinessItem {
   notes: string | null;
   /** True when a sale already exists and the checklist there is authoritative. */
   trackedOnSale: boolean;
+  /** Category 1 and 2 documents have a blank the app can print. */
+  canProduce: boolean;
+  /** The dealership's own approved copy is loaded (vs the DEMO stand-in). */
+  hasApprovedTemplate: boolean;
+  /** Latest produced or filed copy for this car, openable via /api/files. */
+  latestFileId: string | null;
+  latestStatus: "GENERATED" | "SENT" | "PARTIALLY_SIGNED" | "SIGNED" | "VOIDED" | "FILED" | null;
+  /** The signed document is on file for this car — the requirement is met. */
+  onFile: boolean;
 }
 
 export interface IntakeReadiness {
@@ -91,16 +100,33 @@ export async function intakeReadiness(episodeId: string): Promise<IntakeReadines
       )
     : new Set<string>();
 
-  const byKey = new Map(templates.map((t) => [t.key, t]));
-  const items: IntakeReadinessItem[] = results.map((r) => ({
-    key: r.key,
-    name: byKey.get(r.key)?.name ?? r.key,
-    state: r.state,
-    reason: r.reason,
-    notes: byKey.get(r.key)?.notes ?? null,
-    trackedOnSale: tracked.has(r.key),
-  }));
+  // What has already been printed or filed for this car (no sale attached).
+  // Latest version per template wins; VOIDED copies are superseded history.
+  const instances = await db.documentInstance.findMany({
+    where: { episodeId, saleId: null, templateId: { in: templates.map((t) => t.id) }, status: { not: "VOIDED" } },
+    orderBy: { version: "asc" },
+  });
+  const latestByTemplate = new Map(instances.map((i) => [i.templateId, i]));
 
-  const blockers = items.filter((i) => i.state === "REQUIRED" && !i.trackedOnSale);
+  const byKey = new Map(templates.map((t) => [t.key, t]));
+  const items: IntakeReadinessItem[] = results.map((r) => {
+    const template = byKey.get(r.key);
+    const latest = template ? (latestByTemplate.get(template.id) ?? null) : null;
+    return {
+      key: r.key,
+      name: template?.name ?? r.key,
+      state: r.state,
+      reason: r.reason,
+      notes: template?.notes ?? null,
+      trackedOnSale: tracked.has(r.key),
+      canProduce: template != null && (template.category === 1 || template.category === 2),
+      hasApprovedTemplate: Boolean(template?.approvedFileId),
+      latestFileId: latest?.fileId ?? null,
+      latestStatus: latest?.status ?? null,
+      onFile: latest != null && (latest.status === "SIGNED" || latest.status === "FILED"),
+    };
+  });
+
+  const blockers = items.filter((i) => i.state === "REQUIRED" && !i.trackedOnSale && !i.onFile);
   return { items, blockers, ready: blockers.length === 0 };
 }

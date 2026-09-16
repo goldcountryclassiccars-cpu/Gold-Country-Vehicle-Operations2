@@ -195,3 +195,158 @@ export async function fileDocument(user: SessionUser, documentId: string) {
   await audit(user, { action: "document.file", resourceType: "document", resourceId: documentId });
   return updated;
 }
+
+/**
+ * Produces an intake-timed document (the consignment agreement above all) for
+ * a car that has no sale yet. Serves the dealership's approved copy when one
+ * is loaded; otherwise the DEMONSTRATION stand-in, labelled as such. The
+ * instance hangs on the episode (saleId null) — if a deal opens later, the
+ * sale checklist adopts what was filed here rather than asking again.
+ */
+export async function produceIntakeDocument(user: SessionUser, episodeId: string, templateKey: string) {
+  const episode = await db.inventoryEpisode.findUniqueOrThrow({
+    where: { id: episodeId },
+    include: { vehicle: true },
+  });
+  const template = await db.documentTemplate.findUniqueOrThrow({ where: { key: templateKey } });
+  if (!template.active) throw new DocumentError("This document is no longer active.");
+  if (template.timing !== "INTAKE") {
+    throw new DocumentError("Only intake-timed documents can be produced without a sale.");
+  }
+  // Category 3 is a controlled original (a title, a serialized DMV form) and
+  // category 4 is produced by a third party — neither has a blank we print.
+  if (template.category !== 1 && template.category !== 2) {
+    throw new DocumentError("This document is issued elsewhere — it cannot be printed from here.");
+  }
+  if (template.appliesTo !== "all" && template.appliesTo !== episode.dealType) {
+    throw new DocumentError("Template does not apply to this deal type");
+  }
+
+  const approved = template.approvedFileId
+    ? await db.fileObject.findUnique({ where: { id: template.approvedFileId } })
+    : null;
+  const data: Buffer = approved
+    ? await storage().get(approved.storageKey)
+    : await renderDemoPdf({
+        templateName: template.name,
+        stockNumber: episode.stockNumber,
+        vehicle: vehicleLabel(episode.vehicle),
+        dealType: episode.dealType,
+      });
+
+  const prior = await db.documentInstance.findFirst({
+    where: { episodeId, saleId: null, templateId: template.id },
+    orderBy: { version: "desc" },
+  });
+  const version = (prior?.version ?? 0) + 1;
+  const extension = approved ? (approved.contentType === "application/pdf" ? "pdf" : "docx") : "pdf";
+  const storageKey = `documents/${episodeId}/intake-${template.key}-v${version}.${extension}`;
+  await storage().put(storageKey, data);
+  const file = await db.fileObject.create({
+    data: {
+      storageKey,
+      adapter: config().STORAGE_ADAPTER,
+      originalName: `${episode.stockNumber}-${template.key}-v${version}.${extension}`,
+      contentType: approved?.contentType ?? "application/pdf",
+      sizeBytes: data.length,
+      uploadedBy: user.id,
+      // A blank copy for this car holds no customer data yet. The SIGNED scan
+      // uploaded later is what carries signed_docs sensitivity.
+      sensitivity: null,
+    },
+  });
+  const instance = await db.documentInstance.create({
+    data: { episodeId, saleId: null, templateId: template.id, version, fileId: file.id, generatedById: user.id },
+  });
+  if (prior && prior.status === "GENERATED") {
+    await db.documentInstance.update({ where: { id: prior.id }, data: { status: "VOIDED" } });
+  }
+  await audit(user, {
+    action: "document.generate",
+    resourceType: "document",
+    resourceId: instance.id,
+    newValues: { template: template.key, version, episodeId, approved: Boolean(approved), intake: true },
+  });
+  return { instance, fileId: file.id, approved: Boolean(approved) };
+}
+
+const ALLOWED_SCAN_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic"]);
+const MAX_SCAN_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Records that the signed intake document is on file — with a scan or photo of
+ * the signed copy when there is one, or by marking the produced copy filed.
+ * FILED always points at evidence: with no scan there must be a produced copy
+ * to mark, so "on file" can never be claimed about nothing.
+ */
+export async function markIntakeDocumentOnFile(
+  user: SessionUser,
+  episodeId: string,
+  templateKey: string,
+  scan?: { originalName: string; contentType: string; data: Buffer } | null,
+) {
+  const template = await db.documentTemplate.findUniqueOrThrow({ where: { key: templateKey } });
+  const prior = await db.documentInstance.findFirst({
+    where: { episodeId, saleId: null, templateId: template.id, status: { not: "VOIDED" } },
+    orderBy: { version: "desc" },
+  });
+
+  if (scan) {
+    if (!ALLOWED_SCAN_TYPES.has(scan.contentType)) {
+      throw new DocumentError("Upload the signed copy as a PDF or a photo (JPEG/PNG/HEIC).");
+    }
+    if (scan.data.length === 0) throw new DocumentError("That file is empty.");
+    if (scan.data.length > MAX_SCAN_BYTES) throw new DocumentError("That file is larger than 25MB.");
+
+    const version = (prior?.version ?? 0) + 1;
+    const ext = scan.contentType === "application/pdf" ? "pdf" : (scan.contentType.split("/")[1] ?? "bin");
+    const storageKey = `documents/${episodeId}/intake-${template.key}-signed-v${version}.${ext}`;
+    await storage().put(storageKey, scan.data);
+    const file = await db.fileObject.create({
+      data: {
+        storageKey,
+        adapter: config().STORAGE_ADAPTER,
+        originalName: scan.originalName,
+        contentType: scan.contentType,
+        sizeBytes: scan.data.length,
+        uploadedBy: user.id,
+        sensitivity: "signed_docs", // the signed copy carries the consignor's details
+      },
+    });
+    const instance = await db.documentInstance.create({
+      data: {
+        episodeId,
+        saleId: null,
+        templateId: template.id,
+        version,
+        fileId: file.id,
+        generatedById: user.id,
+        status: "FILED",
+        signedAt: new Date(),
+        filedAt: new Date(),
+      },
+    });
+    await audit(user, {
+      action: "document.filed",
+      resourceType: "document",
+      resourceId: instance.id,
+      newValues: { template: template.key, episodeId, scanned: true },
+    });
+    return instance;
+  }
+
+  if (!prior) {
+    throw new DocumentError("Nothing to mark on file — print the document first, or upload the signed copy.");
+  }
+  const instance = await db.documentInstance.update({
+    where: { id: prior.id },
+    data: { status: "FILED", signedAt: prior.signedAt ?? new Date(), filedAt: new Date() },
+  });
+  await audit(user, {
+    action: "document.filed",
+    resourceType: "document",
+    resourceId: instance.id,
+    newValues: { template: template.key, episodeId, scanned: false },
+  });
+  return instance;
+}
