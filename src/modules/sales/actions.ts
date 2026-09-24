@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/authz/engine";
+import { db } from "@/lib/db";
 import {
   cancelSale,
   createSale,
@@ -39,11 +40,39 @@ const newSaleSchema = z.object({
   notes: z.preprocess(emptyToUndef, z.string().optional()),
 });
 
-export async function createSaleAction(formData: FormData) {
+/**
+ * State returned to the New Deal form. A refused deal MUST say why on screen:
+ * the original version swallowed SalesError with a bare `return`, so clicking
+ * "Open deal" on a car whose odometer status was still Unknown did nothing
+ * visible at all — which is how a safety gate turns into a mystery.
+ */
+export interface NewSaleState {
+  error?: string;
+  /** When we know exactly where the fix lives, link straight to it. */
+  fixHref?: string;
+  fixLabel?: string;
+}
+
+const NEW_SALE_FIELD_LABELS: Record<string, string> = {
+  episodeId: "Vehicle",
+  agreedPrice: "Agreed price",
+  depositAmount: "Deposit",
+  buyerName: "Buyer name",
+  buyerEmail: "Buyer email",
+  buyerPhone: "Buyer phone",
+  buyerCity: "Buyer city",
+  buyerState: "Buyer state",
+};
+
+export async function createSaleAction(_prev: NewSaleState, formData: FormData): Promise<NewSaleState> {
   const user = await getSessionUser();
   requirePermission(user, "create", "sales");
   const parsed = newSaleSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!parsed.success) return;
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = NEW_SALE_FIELD_LABELS[String(issue?.path[0] ?? "")] ?? "One of the fields";
+    return { error: `${field}: ${issue?.message ?? "invalid value"}.` };
+  }
   const d = parsed.data;
   let saleId: string;
   try {
@@ -56,7 +85,22 @@ export async function createSaleAction(formData: FormData) {
     });
     saleId = sale.id;
   } catch (e) {
-    if (e instanceof SalesError) return;
+    if (e instanceof SalesError) {
+      // The odometer gate is the one every imported car starts behind —
+      // hand back the exact place to fix it, not just the refusal.
+      if (/odometer|mileage/i.test(e.message)) {
+        const episode = await db.inventoryEpisode.findUnique({
+          where: { id: d.episodeId },
+          select: { vehicleId: true },
+        });
+        return {
+          error: e.message,
+          fixHref: episode ? `/vehicles/${episode.vehicleId}` : undefined,
+          fixLabel: "Open the vehicle record — press Edit and set Mileage status",
+        };
+      }
+      return { error: e.message };
+    }
     throw e;
   }
   revalidateSale(saleId, d.episodeId);
