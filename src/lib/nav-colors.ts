@@ -145,6 +145,7 @@ const NAV_ACCENT_KEY: Record<string, AccentKey> = {
   "/my-work": "amber",
   "/vehicles": "blue",
   "/pipeline": "violet",
+  "/calendar": "teal",
   "/inspections": "teal",
   "/work-orders": "orange",
   "/expenses": "rose",

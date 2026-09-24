@@ -47,6 +47,8 @@ model User {
   departments UserDepartment[]
   sessions    Session[]
   auditEvents AuditEvent[]     @relation("AuditActor")
+  shifts      StaffShift[]     @relation("ShiftUser")
+  timeOff     StaffTimeOff[]   @relation("TimeOffUser")
 }
 
 model Session {
@@ -1316,4 +1318,72 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt])
+}
+
+// ---------------------------------------------------------------------------
+// Calendar: appointments (internal + mirrored from Google), staff shifts,
+// and time off. Days are stored noon-UTC (see src/lib/dealership-date.ts);
+// timed events are real instants grouped onto dealership-local days for display.
+// ---------------------------------------------------------------------------
+
+enum CalendarEventSource {
+  INTERNAL
+  GOOGLE
+}
+
+enum TimeOffKind {
+  VACATION
+  TIME_OFF
+}
+
+model CalendarEvent {
+  id          String              @id @default(uuid())
+  title       String
+  startsAt    DateTime
+  endsAt      DateTime?
+  allDay      Boolean             @default(false)
+  location    String?
+  notes       String?
+  /// Optional link to the car the appointment is about.
+  episodeId   String?
+  source      CalendarEventSource @default(INTERNAL)
+  /// Google iCal UID for mirrored events (recurring instances share it).
+  googleUid   String?
+  createdById String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([startsAt])
+  @@index([source])
+}
+
+model StaffShift {
+  id          String   @id @default(uuid())
+  user        User     @relation("ShiftUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  /// The scheduled day, stored as noon UTC.
+  day         DateTime
+  /// Free-text hours, e.g. "9–5" or "morning only".
+  hours       String?
+  note        String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, day])
+  @@index([day])
+}
+
+model StaffTimeOff {
+  id          String      @id @default(uuid())
+  user        User        @relation("TimeOffUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  /// Inclusive range of days, stored as noon UTC.
+  startDay    DateTime
+  endDay      DateTime
+  kind        TimeOffKind @default(TIME_OFF)
+  note        String?
+  createdById String
+  createdAt   DateTime    @default(now())
+
+  @@index([startDay, endDay])
 }

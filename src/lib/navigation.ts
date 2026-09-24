@@ -21,6 +21,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/my-work", label: "My Work", icon: "ClipboardCheck", requires: { resource: "tasks", action: "view" } },
   { href: "/vehicles", label: "Vehicles", icon: "Car", requires: { resource: "vehicles", action: "view" } },
   { href: "/pipeline", label: "Pipeline", icon: "Kanban", requires: { resource: "episodes", action: "view" } },
+  { href: "/calendar", label: "Calendar", icon: "CalendarDays", requires: { resource: "calendar", action: "view" } },
   { href: "/inspections", label: "Inspections", icon: "Search", requires: { resource: "inspections", action: "view" } },
   { href: "/work-orders", label: "Work Orders", icon: "Wrench", requires: { resource: "work_orders", action: "view" } },
   { href: "/expenses", label: "Expenses", icon: "Receipt", requires: { resource: "expenses", action: "view" } },

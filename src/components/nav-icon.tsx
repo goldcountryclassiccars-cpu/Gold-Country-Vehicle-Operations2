@@ -2,6 +2,7 @@
 
 import {
   Archive,
+  CalendarDays,
   BadgeCheck,
   Banknote,
   BarChart3,
@@ -27,6 +28,7 @@ import {
 
 const ICONS: Record<string, LucideIcon> = {
   Archive,
+  CalendarDays,
   BadgeCheck,
   Banknote,
   BarChart3,
