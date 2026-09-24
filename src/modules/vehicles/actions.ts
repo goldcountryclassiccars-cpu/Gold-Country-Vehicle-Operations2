@@ -6,6 +6,7 @@ import { z } from "zod";
 import { IdentifierType, MileageStatus, DealType } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth/current-user";
 import { requirePermission, canViewField } from "@/lib/authz/engine";
+import { db } from "@/lib/db";
 import { createVehicle, addIdentifier, updateVehicle } from "./service";
 import { createEpisode } from "@/modules/episodes/service";
 
@@ -144,8 +145,20 @@ export async function updateVehicleAction(_prev: EditVehicleState, formData: For
     return { error: parsed.error.issues.map((i) => i.message).join("; ") };
   }
   const { vehicleId, ...fields } = parsed.data;
-  await updateVehicle(user, vehicleId, fields);
+  try {
+    await updateVehicle(user, vehicleId, fields);
+  } catch (e) {
+    // Never fail silently or with a blank error page — say so in the form.
+    const message = e instanceof Error ? e.message : "an unexpected error";
+    return { error: `Could not save: ${message}. Reload the page to see whether the change took.` };
+  }
   revalidatePath(`/vehicles/${vehicleId}`);
   revalidatePath("/vehicles");
+  // Screens that read the vehicle through its episode (the paperwork panel,
+  // the deal gate) must show the correction immediately too.
+  const episodes = await db.inventoryEpisode.findMany({ where: { vehicleId }, select: { id: true } });
+  for (const episode of episodes) revalidatePath(`/episodes/${episode.id}`);
+  revalidatePath("/pipeline");
+  revalidatePath("/sales");
   return { saved: true };
 }

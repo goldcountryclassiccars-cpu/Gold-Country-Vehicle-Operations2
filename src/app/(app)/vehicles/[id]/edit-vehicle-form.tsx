@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { MileageStatus } from "@prisma/client";
 import { Field, inputClass } from "@/components/ui";
 import { updateVehicleAction, type EditVehicleState } from "@/modules/vehicles/actions";
@@ -40,6 +40,13 @@ export function EditVehicleForm({ vehicle }: { vehicle: EditableVehicle }) {
   const [state, formAction, pending] = useActionState<EditVehicleState, FormData>(updateVehicleAction, {});
   const [open, setOpen] = useState(false);
 
+  // A successful save closes the editor and shows "Saved" — before this, the
+  // form stayed open with no confirmation at all, so a saved change and a
+  // discarded one looked identical.
+  useEffect(() => {
+    if (state.saved) setOpen(false);
+  }, [state]);
+
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -55,11 +62,15 @@ export function EditVehicleForm({ vehicle }: { vehicle: EditableVehicle }) {
           aria-expanded={open}
           className="min-h-11 rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium hover:bg-stone-50"
         >
-          {open ? "Cancel" : "Edit"}
+          {open ? "Discard changes" : "Edit"}
         </button>
       </div>
 
-      {state.saved && !open ? <p className="mt-3 text-sm text-emerald-700">Saved.</p> : null}
+      {state.saved && !open ? (
+        <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+          Saved — the details below are updated.
+        </p>
+      ) : null}
 
       {open ? (
         <form action={formAction} className="mt-4 grid gap-3 border-t border-stone-100 pt-4 sm:grid-cols-2">
@@ -126,11 +137,14 @@ export function EditVehicleForm({ vehicle }: { vehicle: EditableVehicle }) {
             </p>
           ) : null}
 
-          <div className="sm:col-span-2">
+          {/* Sticky, so Save is on screen even mid-form on a phone — the old
+              bottom-only button was below the fold, and the visible "Cancel"
+              up top silently discarded the change. */}
+          <div className="sticky bottom-0 sm:col-span-2 -mx-4 -mb-4 rounded-b-lg border-t border-stone-200 bg-white px-4 py-3">
             <button
               type="submit"
               disabled={pending}
-              className="min-h-11 rounded-md bg-brand-700 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-800 disabled:opacity-60"
+              className="min-h-11 w-full rounded-md bg-brand-700 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 disabled:opacity-60 sm:w-auto"
             >
               {pending ? "Saving…" : "Save changes"}
             </button>
