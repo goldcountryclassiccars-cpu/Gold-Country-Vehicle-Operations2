@@ -14,30 +14,34 @@ export const metadata: Metadata = { title: "Vehicles" };
 export default async function VehiclesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; archived?: string }>;
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/login?expired=1");
   requirePermission(user, "view", "vehicles");
-  const { q } = await searchParams;
+  const { q, archived } = await searchParams;
+  const showArchived = archived === "1";
 
-  const where = vehicleWhereForUser(user);
+  // Deleted (archived) cars stay out of the list by default — that is the
+  // whole point of deleting them. "Show archived" brings them back so a
+  // mistaken delete is always recoverable. A vehicle with no episodes yet is
+  // current: it is being set up, not deleted.
+  const filters: object[] = [vehicleWhereForUser(user)];
+  if (!showArchived) {
+    filters.push({ OR: [{ episodes: { some: { active: true } } }, { episodes: { none: {} } }] });
+  }
+  if (q) {
+    filters.push({
+      OR: [
+        { make: { contains: q, mode: "insensitive" } },
+        { model: { contains: q, mode: "insensitive" } },
+        { identifiers: { some: { value: { contains: q, mode: "insensitive" } } } },
+        { episodes: { some: { stockNumber: { contains: q, mode: "insensitive" } } } },
+      ],
+    });
+  }
   const vehicles = await db.vehicle.findMany({
-    where: q
-      ? {
-          AND: [
-            where,
-            {
-              OR: [
-                { make: { contains: q, mode: "insensitive" } },
-                { model: { contains: q, mode: "insensitive" } },
-                { identifiers: { some: { value: { contains: q, mode: "insensitive" } } } },
-                { episodes: { some: { stockNumber: { contains: q, mode: "insensitive" } } } },
-              ],
-            },
-          ],
-        }
-      : where,
+    where: { AND: filters },
     include: {
       identifiers: { where: { isPrimary: true }, take: 1 },
       episodes: { orderBy: { createdAt: "desc" }, take: 1 },
@@ -106,7 +110,11 @@ export default async function VehiclesPage({
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Vehicles"
-        subtitle="Every vehicle the dealership has handled — current and historical."
+        subtitle={
+          showArchived
+            ? "Every vehicle the dealership has handled — including deleted (archived) ones."
+            : "Current inventory. Deleted vehicles are kept under Show archived."
+        }
         actions={
           hasPermission(user, "vehicles", "create") ? (
             <Link
@@ -119,7 +127,7 @@ export default async function VehiclesPage({
         }
       />
 
-      <form className="mb-4" action="/vehicles" method="get">
+      <form className="mb-4 flex flex-wrap items-center gap-3" action="/vehicles" method="get">
         <label htmlFor="q" className="sr-only">
           Search vehicles
         </label>
@@ -131,6 +139,13 @@ export default async function VehiclesPage({
           placeholder="Search make, model, VIN, stock number…"
           className="w-full max-w-md rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm"
         />
+        {showArchived ? <input type="hidden" name="archived" value="1" /> : null}
+        <Link
+          href={showArchived ? (q ? `/vehicles?q=${encodeURIComponent(q)}` : "/vehicles") : (q ? `/vehicles?archived=1&q=${encodeURIComponent(q)}` : "/vehicles?archived=1")}
+          className="text-sm text-brand-700 hover:underline"
+        >
+          {showArchived ? "Hide archived" : "Show archived"}
+        </Link>
       </form>
 
       <DataTable

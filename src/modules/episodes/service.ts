@@ -170,6 +170,14 @@ export async function changeEpisodeStatus(
 export async function archiveEpisode(user: SessionUser, episodeId: string, reason: string) {
   const episode = await db.inventoryEpisode.findUniqueOrThrow({ where: { id: episodeId } });
   if (!episode.active) return episode;
+  // Deleting a car with a live deal would hide the sale from every screen
+  // that knows how to finish it. Cancel or complete the deal first.
+  const openDeals = await db.saleTransaction.count({
+    where: { episodeId, status: { notIn: ["CANCELED", "UNWOUND", "COMPLETE"] } },
+  });
+  if (openDeals > 0) {
+    throw new StatusError("This car has a deal in progress — cancel or finish the deal before deleting it.");
+  }
   const updated = await db.inventoryEpisode.update({
     where: { id: episodeId },
     data: { active: false, archivedAt: new Date() },

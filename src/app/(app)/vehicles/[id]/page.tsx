@@ -7,7 +7,8 @@ import { db } from "@/lib/db";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { addIdentifierAction } from "@/modules/vehicles/actions";
 import { EditVehicleForm } from "./edit-vehicle-form";
-import { BOARD_TONE, boardStage } from "@/modules/episodes/board";
+import { BOARD_TONE, boardStage, hasOpenDeal } from "@/modules/episodes/board";
+import { DeleteVehicleControl } from "@/components/delete-vehicle";
 import { Badge, Card, DescriptionList, EmptyState, PageHeader, inputClass } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Vehicle" };
@@ -44,6 +45,11 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   if (!authorize(user, "view", "vehicles", { assignedUserIds: assigned })) notFound();
 
   const canEdit = hasPermission(user, "vehicles", "edit");
+  // The same delete control as the episode page, aimed at this car's active
+  // episode — whichever page Jade lands on first, the button is at the top.
+  const activeEpisode = vehicle.episodes.find((e) => e.active);
+  const canDelete =
+    activeEpisode != null && hasPermission(user, "episodes", "archive") && !hasOpenDeal(activeEpisode);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -51,10 +57,8 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         title={vehicleLabel(vehicle)}
         subtitle={vehicle.generalDescription ?? undefined}
         actions={
-          hasPermission(user, "episodes", "create") ? (
-            <span className="text-xs text-stone-500">
-              Repeat acquisition? A new episode can be started from Administration in a later phase.
-            </span>
+          canDelete ? (
+            <DeleteVehicleControl episodeId={activeEpisode.id} stockNumber={activeEpisode.stockNumber} />
           ) : undefined
         }
       />

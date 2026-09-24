@@ -129,7 +129,12 @@ export async function archiveEpisodeAction(formData: FormData) {
   requirePermission(user, "archive", "episodes");
   const parsed = archiveSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return;
-  await archiveEpisode(user, parsed.data.episodeId, parsed.data.reason);
+  try {
+    await archiveEpisode(user, parsed.data.episodeId, parsed.data.reason);
+  } catch (e) {
+    if (e instanceof StatusError) return; // open deal — the UI hides the control in this state
+    throw e;
+  }
   revalidatePath(`/episodes/${parsed.data.episodeId}`);
   revalidatePath("/vehicles");
   revalidatePath("/pipeline");
