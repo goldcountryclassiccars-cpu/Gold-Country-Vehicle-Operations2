@@ -9,6 +9,7 @@ import { addIdentifierAction } from "@/modules/vehicles/actions";
 import { EditVehicleForm } from "./edit-vehicle-form";
 import { BOARD_TONE, boardStage, hasOpenDeal } from "@/modules/episodes/board";
 import { DeleteVehicleControl } from "@/components/delete-vehicle";
+import { PhotoSection } from "@/components/photo-section";
 import { Badge, Card, DescriptionList, EmptyState, PageHeader, inputClass } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Vehicle" };
@@ -62,6 +63,12 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           ) : undefined
         }
       />
+
+      {activeEpisode ? (
+        <div className="mb-6">
+          <PhotoSection user={user} episodeId={activeEpisode.id} />
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

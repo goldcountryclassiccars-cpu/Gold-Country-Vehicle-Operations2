@@ -912,7 +912,12 @@ enum MediaKind {
 model MediaAsset {
   id           String    @id @default(uuid())
   episodeId    String
-  fileId       String // FileObject id
+  fileId       String // FileObject id (the original)
+  // Resized copies made at upload time so galleries load small files. Nullable:
+  // an upload whose browser could not resize (e.g. HEIC on desktop Chrome)
+  // falls back to serving the original.
+  webFileId    String?
+  thumbFileId  String?
   kind         MediaKind @default(PHOTO)
   // Category keys match MediaChecklistItem.key so readiness is computable.
   category     String    @default("other")
@@ -923,6 +928,19 @@ model MediaAsset {
   archivedAt   DateTime?
 
   @@index([episodeId, category])
+}
+
+// A video about the vehicle that lives elsewhere (Google Photos, YouTube).
+// Storing links instead of video files keeps storage costs at photo scale.
+model VideoLink {
+  id          String   @id @default(uuid())
+  episodeId   String
+  url         String
+  label       String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@index([episodeId])
 }
 
 // Configurable media checklist (Administration-editable).

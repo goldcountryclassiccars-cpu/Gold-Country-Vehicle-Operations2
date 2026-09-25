@@ -19,7 +19,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Media files require media:view; other files default to documents:view.
-  const asset = await db.mediaAsset.findFirst({ where: { fileId: id } });
+  // A photo's resized copies (webFileId/thumbFileId) are media the same as its
+  // original.
+  const asset = await db.mediaAsset.findFirst({
+    where: { OR: [{ fileId: id }, { webFileId: id }, { thumbFileId: id }] },
+  });
   if (asset) {
     if (!hasPermission(user, "media", "view")) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });

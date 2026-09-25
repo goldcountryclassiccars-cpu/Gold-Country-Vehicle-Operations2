@@ -2,7 +2,7 @@
   "name": "gccc-ops",
   "version": "0.1.0",
   "private": true,
-  "description": "Gold Country Classic Cars \u2014 Vehicle Operations Platform",
+  "description": "Gold Country Classic Cars — Vehicle Operations Platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1124.0",
+    "@aws-sdk/s3-request-presigner": "^3.1140.0",
     "@prisma/client": "^6",
     "@tanstack/react-table": "^8",
     "bcryptjs": "^2.4.3",

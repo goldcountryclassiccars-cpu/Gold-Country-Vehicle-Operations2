@@ -8,6 +8,7 @@ import { vehicleLabel } from "@/modules/vehicles/service";
 import { sanitizeArrangementForUser } from "@/modules/vehicles/sanitize";
 import { BOARD_BLURB, BOARD_TONE, boardStage, hasOpenDeal } from "@/modules/episodes/board";
 import { DeleteVehicleControl } from "@/components/delete-vehicle";
+import { PhotoSection } from "@/components/photo-section";
 import { StageLockedNote, StageMove } from "@/components/stage-move";
 import { STATUS_DIMENSIONS, type StatusDimension } from "@/modules/episodes/service";
 import {
@@ -232,6 +233,10 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
           ) : null}
         </Card>
       ) : null}
+
+      <div className="mb-6">
+        <PhotoSection user={user} episodeId={episode.id} />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

@@ -4,7 +4,15 @@
 import { createHash } from "crypto";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
-import { storage, newStorageKey, sha256, validateUpload } from "@/lib/adapters/storage";
+import {
+  ALLOWED_UPLOAD_TYPES,
+  MAX_UPLOAD_BYTES,
+  newStorageKey,
+  sha256,
+  signUploadToken,
+  storage,
+  validateUpload,
+} from "@/lib/adapters/storage";
 import { config } from "@/lib/config";
 import type { SessionUser } from "@/lib/authz/types";
 
@@ -60,6 +68,186 @@ export async function uploadMediaAsset(
     newValues: { episodeId: input.episodeId, category: input.category, name: input.originalName },
   });
   return asset;
+}
+
+// ---------------------------------------------------------------------------
+// Direct-to-storage photo uploads
+//
+// The browser asks for upload targets (request), PUTs each file straight to
+// storage — skipping the app server and its request-size cap — then reports
+// back (finalize). Photos are resized in the browser before upload, so each
+// photo arrives as up to three files: the original, a web-size copy for the
+// gallery, and a thumbnail for grids. The originals are the record — the
+// resized copies exist so pages stay fast on a phone.
+// ---------------------------------------------------------------------------
+
+export type PhotoVariant = "original" | "web" | "thumb";
+const PHOTO_VARIANTS: PhotoVariant[] = ["original", "web", "thumb"];
+
+export interface PhotoUploadTarget {
+  variant: PhotoVariant;
+  key: string;
+  /** Direct-to-storage URL (null in local dev — use fallbackUrl). */
+  putUrl: string | null;
+  /** The app's own token-authorized upload route, for dev and small-file fallback. */
+  fallbackUrl: string;
+}
+
+async function requireActiveEpisode(episodeId: string) {
+  const episode = await db.inventoryEpisode.findUnique({ where: { id: episodeId } });
+  if (!episode) throw new MediaError("That vehicle record no longer exists.");
+  return episode;
+}
+
+/** Upload targets for one photo (original + web + thumb). */
+export async function requestPhotoUpload(
+  user: SessionUser,
+  input: { episodeId: string; fileName: string; contentType: string; sizeBytes: number },
+): Promise<{ targets: PhotoUploadTarget[] }> {
+  await requireActiveEpisode(input.episodeId);
+  const types = ALLOWED_UPLOAD_TYPES.image!;
+  if (!types.includes(input.contentType)) {
+    throw new MediaError("That file is not a photo the app can accept (JPEG, PNG, WEBP or HEIC).");
+  }
+  const max = MAX_UPLOAD_BYTES.image!;
+  if (input.sizeBytes <= 0 || input.sizeBytes > max) {
+    throw new MediaError(`Photos can be up to ${Math.round(max / 1024 / 1024)}MB each.`);
+  }
+
+  const exp = Math.floor(Date.now() / 1000) + 15 * 60;
+  const targets: PhotoUploadTarget[] = [];
+  for (const variant of PHOTO_VARIANTS) {
+    // Resized variants are always JPEG (the browser re-encodes them).
+    const contentType = variant === "original" ? input.contentType : "image/jpeg";
+    const name = variant === "original" ? input.fileName : `${variant}.jpg`;
+    const key = newStorageKey(`media/${input.episodeId}/${variant}`, name);
+    const token = signUploadToken({ key, contentType, userId: user.id, maxBytes: max, exp });
+    targets.push({
+      variant,
+      key,
+      putUrl: await storage().presignPut(key, contentType),
+      fallbackUrl: `/api/media/direct-upload?token=${encodeURIComponent(token)}`,
+    });
+  }
+  return { targets };
+}
+
+/**
+ * Registers an uploaded photo on the vehicle. Keys must be ones this app
+ * issued for this episode (prefix-checked) and must actually exist in storage
+ * — the client's word alone is never enough.
+ */
+export async function finalizePhotoUpload(
+  user: SessionUser,
+  input: {
+    episodeId: string;
+    originalName: string;
+    contentType: string;
+    originalKey: string;
+    webKey?: string | null;
+    thumbKey?: string | null;
+    category?: string | null;
+    caption?: string | null;
+  },
+) {
+  await requireActiveEpisode(input.episodeId);
+
+  const makeFile = async (key: string | null | undefined, variant: PhotoVariant) => {
+    if (!key) return null;
+    if (!key.startsWith(`media/${input.episodeId}/${variant}/`)) {
+      throw new MediaError("Upload did not match this vehicle — please try again.");
+    }
+    const found = await storage().head(key);
+    if (!found) throw new MediaError("The upload did not finish — please try again.");
+    validateUpload("image", variant === "original" ? input.contentType : "image/jpeg", found.sizeBytes);
+    return db.fileObject.create({
+      data: {
+        storageKey: key,
+        adapter: config().STORAGE_ADAPTER,
+        originalName: variant === "original" ? input.originalName : `${variant} of ${input.originalName}`,
+        contentType: variant === "original" ? input.contentType : "image/jpeg",
+        sizeBytes: found.sizeBytes,
+        uploadedBy: user.id,
+      },
+    });
+  };
+
+  const original = await makeFile(input.originalKey, "original");
+  if (!original) throw new MediaError("The upload did not finish — please try again.");
+  const web = await makeFile(input.webKey, "web");
+  const thumb = await makeFile(input.thumbKey, "thumb");
+
+  const maxSort = await db.mediaAsset.aggregate({ where: { episodeId: input.episodeId }, _max: { sortOrder: true } });
+  const asset = await db.mediaAsset.create({
+    data: {
+      episodeId: input.episodeId,
+      fileId: original.id,
+      webFileId: web?.id ?? null,
+      thumbFileId: thumb?.id ?? null,
+      kind: "PHOTO",
+      category: input.category?.trim() || "other",
+      caption: input.caption?.trim() || null,
+      sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
+      uploadedById: user.id,
+    },
+  });
+  await audit(user, {
+    action: "media.upload",
+    resourceType: "media",
+    resourceId: asset.id,
+    newValues: {
+      episodeId: input.episodeId,
+      name: input.originalName,
+      sizeBytes: original.sizeBytes,
+      resized: Boolean(web || thumb),
+    },
+  });
+  return asset;
+}
+
+// ---------------------------------------------------------------------------
+// Video links (the videos themselves stay on Google Photos / YouTube)
+// ---------------------------------------------------------------------------
+
+export async function addVideoLink(
+  user: SessionUser,
+  input: { episodeId: string; url: string; label?: string | null },
+) {
+  await requireActiveEpisode(input.episodeId);
+  let parsed: URL;
+  try {
+    parsed = new URL(input.url.trim());
+  } catch {
+    throw new MediaError("That does not look like a link — paste the full https:// address.");
+  }
+  if (parsed.protocol !== "https:") throw new MediaError("Video links must start with https://");
+  const link = await db.videoLink.create({
+    data: {
+      episodeId: input.episodeId,
+      url: parsed.toString(),
+      label: input.label?.trim() || null,
+      createdById: user.id,
+    },
+  });
+  await audit(user, {
+    action: "media.video_link_add",
+    resourceType: "media",
+    resourceId: link.id,
+    newValues: { episodeId: input.episodeId, host: parsed.host, label: link.label },
+  });
+  return link;
+}
+
+export async function removeVideoLink(user: SessionUser, id: string) {
+  const link = await db.videoLink.findUnique({ where: { id } });
+  if (!link) return; // already gone — the desired state
+  await db.videoLink.delete({ where: { id } });
+  await audit(user, {
+    action: "media.video_link_remove",
+    resourceType: "media",
+    resourceId: id,
+    previousValues: { episodeId: link.episodeId, url: link.url },
+  });
 }
 
 // ---------------------------------------------------------------------------

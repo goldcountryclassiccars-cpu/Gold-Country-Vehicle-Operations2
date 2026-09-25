@@ -130,7 +130,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
                       <li key={a.id} className="overflow-hidden rounded-md border border-stone-200">
                         {a.kind === "PHOTO" ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={`/api/files/${a.fileId}`} alt={a.caption ?? a.category} className="h-32 w-full object-cover" />
+                          <img src={`/api/files/${a.thumbFileId ?? a.fileId}`} alt={a.caption ?? a.category} className="h-32 w-full object-cover" />
                         ) : (
                           <div className="flex h-32 items-center justify-center bg-stone-100 text-xs text-stone-500">
                             {a.kind.toLowerCase()}

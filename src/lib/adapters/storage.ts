@@ -8,11 +8,13 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { createHash, randomUUID } from "crypto";
-import { mkdir, readFile, unlink, writeFile } from "fs/promises";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "crypto";
+import { mkdir, readFile, stat, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { config } from "@/lib/config";
 
@@ -20,6 +22,14 @@ export interface StorageAdapter {
   put(key: string, data: Buffer): Promise<void>;
   get(key: string): Promise<Buffer>;
   delete(key: string): Promise<void>;
+  /** Size of the stored object, or null if it does not exist. */
+  head(key: string): Promise<{ sizeBytes: number } | null>;
+  /**
+   * A URL the browser can PUT the file to directly, bypassing the app server
+   * (and its request-size limit), or null when the adapter has no such URL
+   * (local dev) — the caller then uses the app's own upload route.
+   */
+  presignPut(key: string, contentType: string): Promise<string | null>;
 }
 
 class LocalStorageAdapter implements StorageAdapter {
@@ -43,6 +53,17 @@ class LocalStorageAdapter implements StorageAdapter {
   }
   async delete(key: string) {
     await unlink(this.resolve(key)).catch(() => {});
+  }
+  async head(key: string) {
+    try {
+      const s = await stat(this.resolve(key));
+      return { sizeBytes: s.size };
+    } catch {
+      return null;
+    }
+  }
+  async presignPut() {
+    return null; // local dev has no direct URL — uploads go through the app route
   }
 }
 
@@ -90,6 +111,27 @@ class S3StorageAdapter implements StorageAdapter {
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
     );
   }
+
+  async head(key: string) {
+    try {
+      const res = await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      return { sizeBytes: res.ContentLength ?? 0 };
+    } catch {
+      return null;
+    }
+  }
+
+  async presignPut(key: string, contentType: string): Promise<string> {
+    // 15 minutes is enough for a photo set on a slow cell connection; the
+    // signature covers key and content type, so the URL can't write elsewhere.
+    return getSignedUrl(
+      this.client,
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }),
+      { expiresIn: 15 * 60 },
+    );
+  }
 }
 
 let adapter: StorageAdapter | null = null;
@@ -133,4 +175,48 @@ export function newStorageKey(prefix: string, originalName: string): string {
 
 export function sha256(data: Buffer): string {
   return createHash("sha256").update(data).digest("hex");
+}
+
+// ---------------------------------------------------------------------------
+// Signed upload tokens — authorize ONE browser PUT of ONE storage key through
+// the app's own upload route. Used as the whole path in local dev (no S3), and
+// as the small-file fallback in production if a direct-to-storage PUT fails.
+// The token pins key, content type, uploader and expiry, so a leaked token
+// can't write anything else, and the route never trusts client-chosen keys.
+// ---------------------------------------------------------------------------
+
+export interface UploadTokenPayload {
+  key: string;
+  contentType: string;
+  userId: string;
+  maxBytes: number;
+  exp: number; // unix seconds
+}
+
+function uploadTokenMac(body: string): string {
+  return createHmac("sha256", config().SESSION_SECRET).update(body).digest("base64url");
+}
+
+export function signUploadToken(payload: UploadTokenPayload): string {
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${body}.${uploadTokenMac(body)}`;
+}
+
+export function verifyUploadToken(token: string): UploadTokenPayload | null {
+  const dot = token.lastIndexOf(".");
+  if (dot < 1) return null;
+  const body = token.slice(0, dot);
+  const mac = token.slice(dot + 1);
+  const expected = uploadTokenMac(body);
+  const a = Buffer.from(mac);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString()) as UploadTokenPayload;
+    if (typeof payload.key !== "string" || typeof payload.exp !== "number") return null;
+    if (payload.exp * 1000 < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
