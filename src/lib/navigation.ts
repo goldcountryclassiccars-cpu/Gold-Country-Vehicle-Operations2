@@ -24,6 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/calendar", label: "Calendar", icon: "CalendarDays", requires: { resource: "calendar", action: "view" } },
   { href: "/inspections", label: "Inspections", icon: "Search", requires: { resource: "inspections", action: "view" } },
   { href: "/work-orders", label: "Work Orders", icon: "Wrench", requires: { resource: "work_orders", action: "view" } },
+  { href: "/parts", label: "Parts & Supplies", icon: "Package", requires: { resource: "parts", action: "view" } },
   { href: "/expenses", label: "Expenses", icon: "Receipt", requires: { resource: "expenses", action: "view" } },
   { href: "/profitability", label: "Profitability", icon: "TrendingUp", requires: { resource: "profitability", action: "view" } },
   { href: "/media", label: "Media", icon: "Camera", requires: { resource: "media", action: "view" } },

@@ -1405,3 +1405,22 @@ model StaffTimeOff {
 
   @@index([startDay, endDay])
 }
+
+// Parts & Supplies — the shop's shared "we need this" list (2026-09-26).
+// Deliberately a plain note, not a purchasing system: what's needed, who asked,
+// and whether someone has ordered it. requestedByName is typed rather than
+// taken from the login because the shop floor shares one iPad account.
+model PartRequest {
+  id              String    @id @default(uuid())
+  description     String
+  requestedByName String
+  createdById     String
+  createdAt       DateTime  @default(now())
+  orderedAt       DateTime?
+  orderedById     String?
+  orderedByName   String?
+  archivedAt      DateTime? // removed from the list (added by mistake); kept for the audit trail
+  archivedById    String?
+
+  @@index([archivedAt, orderedAt])
+}

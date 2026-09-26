@@ -55,6 +55,7 @@ const cardAccents = {
   cyan: "border-t-cyan-500",
   yellow: "border-t-yellow-500",
   stone: "border-t-stone-400",
+  lime: "border-t-lime-500",
 } as const;
 
 export function Card({
@@ -158,6 +159,7 @@ const iconTones = {
   cyan: "bg-cyan-100 text-cyan-700",
   yellow: "bg-yellow-100 text-yellow-700",
   stone: "bg-stone-200 text-stone-600",
+  lime: "bg-lime-100 text-lime-700",
 } as const;
 
 export type IconTone = keyof typeof iconTones;

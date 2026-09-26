@@ -137,6 +137,14 @@ export const ACCENT_STYLES: Record<AccentKey, AccentStyle> = {
     activeText: "text-stone-900",
     activeIcon: "text-stone-600",
   },
+  lime: {
+    chipBg: "bg-lime-100",
+    chipText: "text-lime-700",
+    activeBg: "bg-lime-50",
+    activeBorder: "border-lime-500",
+    activeText: "text-lime-900",
+    activeIcon: "text-lime-600",
+  },
 };
 
 /** href -> accent key. Every entry in NAV_ITEMS should have one. */
@@ -148,6 +156,7 @@ const NAV_ACCENT_KEY: Record<string, AccentKey> = {
   "/calendar": "teal",
   "/inspections": "teal",
   "/work-orders": "orange",
+  "/parts": "lime",
   "/expenses": "rose",
   "/profitability": "green",
   "/media": "indigo",

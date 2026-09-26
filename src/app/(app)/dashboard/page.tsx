@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { ClipboardCheck, LayoutGrid, PackageSearch } from "lucide-react";
+import { ClipboardCheck, LayoutGrid, Package, PackageSearch } from "lucide-react";
 import { getSessionUser } from "@/lib/auth/current-user";
 import { navForUser } from "@/lib/navigation";
 import { hasPermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
 import { episodeWhereForUser } from "@/modules/episodes/service";
 import { workflowWhereForUser } from "@/modules/workflow/service";
+import { countPartsNeeded } from "@/modules/parts/service";
 import { ROLE_TEMPLATES } from "@/lib/authz/registry";
 import { NavIcon } from "@/components/nav-icon";
 import { Badge, StatTile } from "@/components/ui";
@@ -25,13 +26,15 @@ export default async function DashboardPage() {
 
   const canSeeEpisodes = hasPermission(user, "episodes", "view");
   const canSeeTasks = hasPermission(user, "tasks", "view");
+  const canSeeParts = hasPermission(user, "parts", "view");
 
-  const [activeInventory, openTasks, unreadCount] = await Promise.all([
+  const [activeInventory, openTasks, unreadCount, partsNeeded] = await Promise.all([
     canSeeEpisodes ? db.inventoryEpisode.count({ where: { AND: [episodeWhereForUser(user), { active: true }] } }) : null,
     canSeeTasks
       ? db.task.count({ where: { AND: [workflowWhereForUser(user, "tasks") as never, { status: { in: ["OPEN", "IN_PROGRESS", "BLOCKED"] } }] } })
       : null,
     db.notification.count({ where: { userId: user.id, readAt: null } }),
+    canSeeParts ? countPartsNeeded() : null,
   ]);
 
   const stats = [
@@ -40,6 +43,9 @@ export default async function DashboardPage() {
       : null,
     openTasks !== null
       ? { label: "Open tasks assigned to you", value: openTasks, icon: <ClipboardCheck className="h-5 w-5" />, tone: "amber" as const, href: "/my-work" }
+      : null,
+    partsNeeded !== null
+      ? { label: "Parts & supplies to order", value: partsNeeded, icon: <Package className="h-5 w-5" />, tone: "lime" as const, href: "/parts" }
       : null,
     { label: "Unread notifications", value: unreadCount, icon: <LayoutGrid className="h-5 w-5" />, tone: "violet" as const, href: "/notifications" },
   ].filter((s): s is NonNullable<typeof s> => s !== null);
@@ -59,7 +65,7 @@ export default async function DashboardPage() {
       </p>
 
       {stats.length > 0 ? (
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((s) => (
             <StatTile key={s.label} label={s.label} value={s.value} icon={s.icon} tone={s.tone} href={s.href} />
           ))}

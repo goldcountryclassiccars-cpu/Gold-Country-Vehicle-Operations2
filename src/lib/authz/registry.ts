@@ -35,6 +35,7 @@ export const RESOURCES = [
   "audit",
   "admin",
   "calendar",
+  "parts",
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -116,6 +117,8 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       vehicles: { view: "ALL", create: "ALL", edit: "ALL" },
       episodes: { view: "ALL", create: "ALL", edit: "ALL" },
       calendar: { view: "ALL", create: "ALL", edit: "ALL" },
+      // Parts & Supplies is everyone's list — anyone can ask, anyone can tick "ordered".
+      parts: { view: "ALL", create: "ALL", edit: "ALL" },
       intake: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL" },
       locations: { view: "ALL" },
       parties: { view: "ALL", create: "ALL", edit: "ALL" },
@@ -156,6 +159,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       work_orders: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL" },
       media: { view: "ALL", create: "ALL" },
       calendar: { view: "ALL" },
+      parts: { view: "ALL", create: "ALL", edit: "ALL" },
       notifications: { view: "OWN" },
     },
     fieldGrants: [],
