@@ -135,6 +135,34 @@ function RowActions({
         </form>
       ) : null}
 
+      {row.category === 1 && row.documentFileId && gating && canEdit ? (
+        // Staff finished the remaining blanks in Preview/Acrobat: that copy
+        // becomes the document the checklist opens and the signers receive.
+        <form
+          action="/api/documents/filled-copy"
+          method="post"
+          encType="multipart/form-data"
+          className="flex flex-wrap items-center gap-1"
+        >
+          <input type="hidden" name="requirementId" value={row.id} />
+          <input type="hidden" name="saleId" value={saleId} />
+          <label htmlFor={`fill-${row.id}`} className="sr-only">
+            Upload the filled-in {row.name} (PDF)
+          </label>
+          <input
+            id={`fill-${row.id}`}
+            type="file"
+            name="file"
+            accept="application/pdf,.pdf"
+            required
+            className="max-w-[11rem] text-xs"
+          />
+          <button className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-semibold shadow-sm hover:bg-stone-50">
+            Upload filled copy
+          </button>
+        </form>
+      ) : null}
+
       {row.category === 4 && gating && canEdit ? (
         <form
           action="/api/documents/requirement-upload"

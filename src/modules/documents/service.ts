@@ -12,6 +12,7 @@ import { config } from "@/lib/config";
 import { esign } from "@/lib/adapters/esign";
 import type { SessionUser } from "@/lib/authz/types";
 import { vehicleLabel } from "@/modules/vehicles/service";
+import { applyPrefill, prefillForSale } from "@/modules/esign/prefill";
 
 export class DocumentError extends Error {}
 
@@ -91,7 +92,7 @@ export async function generateDocument(user: SessionUser, saleId: string, templa
     ? await db.fileObject.findUnique({ where: { id: template.approvedFileId } })
     : null;
 
-  const data: Buffer = approved
+  let data: Buffer = approved
     ? await storage().get(approved.storageKey)
     : await renderDemoPdf({
         templateName: template.name,
@@ -101,6 +102,14 @@ export async function generateDocument(user: SessionUser, saleId: string, templa
         agreedPrice: Number(sale.agreedPrice),
         dealType: episode.dealType,
       });
+
+  // A fillable approved PDF gets the deal's known details written into its
+  // named fields (buyer, vehicle, VIN, price, 3-day dates). It stays fillable
+  // for whatever the app doesn't hold.
+  if (approved?.contentType === "application/pdf") {
+    const { values, qualifies3Day } = await prefillForSale(saleId);
+    data = await applyPrefill(data, values, qualifies3Day);
+  }
 
   const prior = await db.documentInstance.findFirst({
     where: { saleId, templateId },

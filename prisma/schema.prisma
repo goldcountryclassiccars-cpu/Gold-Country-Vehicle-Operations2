@@ -1039,9 +1039,10 @@ model SaleTransaction {
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
 
-  payments     Payment[]
-  documents    DocumentInstance[]
-  requirements SaleDocumentRequirement[]
+  payments           Payment[]
+  documents          DocumentInstance[]
+  requirements       SaleDocumentRequirement[]
+  signatureEnvelopes SignatureEnvelope[]
 
   @@index([episodeId, status])
   @@index([salespersonId])
@@ -1244,6 +1245,48 @@ model DocumentInstance {
   createdAt          DateTime         @default(now())
 
   @@index([episodeId])
+  @@index([saleId])
+}
+
+enum SignatureEnvelopeStatus {
+  SENT
+  COMPLETED
+  DECLINED
+  CANCELED
+  EXPIRED
+}
+
+// One e-signature request for a deal: the packet of that deal's e-signable
+// documents, merged into one PDF and sent to the buyer(s) and a dealer signer
+// in a single envelope. The provider's own status is authoritative — a webhook
+// only prompts a re-read of it (modules/esign/service.ts).
+model SignatureEnvelope {
+  id                  String                  @id @default(uuid())
+  sale                SaleTransaction         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId              String
+  provider            String // "mock" | "boldsign"
+  externalId          String                  @unique
+  status              SignatureEnvelopeStatus @default(SENT)
+  title               String
+  /// Checklist rows (SaleDocumentRequirement) this envelope covers.
+  requirementIds      String[]
+  /// DocumentInstance versions that went out, in packet order.
+  documentInstanceIds String[]
+  /// [{ role: "BUYER"|"CO_BUYER"|"DEALER", name, email, order, signedAt }]
+  signers             Json
+  sentById            String
+  sentAt              DateTime                @default(now())
+  completedAt         DateTime?
+  endedAt             DateTime?
+  endedReason         String?
+  /// The signed packet and the provider's audit certificate, once complete.
+  signedFileId        String?
+  auditFileId         String?
+  lastSyncedAt        DateTime?
+  lastError           String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
   @@index([saleId])
 }
 

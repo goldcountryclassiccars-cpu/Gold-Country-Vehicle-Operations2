@@ -17,7 +17,12 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
   EMAIL_ADAPTER: z.enum(["log", "smtp"]).default("log"),
   EMAIL_FROM: z.string().default("ops@example.com"),
-  ESIGN_ADAPTER: z.enum(["mock"]).default("mock"),
+  ESIGN_ADAPTER: z.enum(["mock", "boldsign"]).default("mock"),
+  /** BoldSign API key — a sandbox key for testing, a live key for real deals. Never logged. */
+  BOLDSIGN_API_KEY: z.string().optional(),
+  BOLDSIGN_BASE_URL: z.string().url().default("https://api.boldsign.com"),
+  /** Signing secret shown on BoldSign's webhook settings page; verifies webhook calls. */
+  BOLDSIGN_WEBHOOK_SECRET: z.string().optional(),
   LISTING_API_KEY: z.string().min(8).default("dev-listing-api-key"),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(12),
 });
@@ -28,6 +33,13 @@ const envSchema = z.object({
  * than at the moment someone uploads a photo.
  */
 const configSchema = envSchema.superRefine((env, ctx) => {
+  if (env.ESIGN_ADAPTER === "boldsign" && !env.BOLDSIGN_API_KEY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["BOLDSIGN_API_KEY"],
+      message: 'BOLDSIGN_API_KEY is required when ESIGN_ADAPTER="boldsign"',
+    });
+  }
   if (env.STORAGE_ADAPTER !== "s3") return;
   for (const key of ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const) {
     if (!env[key]) {

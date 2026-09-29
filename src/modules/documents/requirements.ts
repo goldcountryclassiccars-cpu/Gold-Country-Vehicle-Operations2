@@ -400,7 +400,7 @@ function summarise(blockers: ComplianceRow[]): string {
 }
 
 /** Recomputes and stores `complete` for one row after a status change. */
-async function refreshComplete(requirementId: string) {
+export async function refreshComplete(requirementId: string) {
   const row = await db.saleDocumentRequirement.findUniqueOrThrow({
     where: { id: requirementId },
     include: { template: true },

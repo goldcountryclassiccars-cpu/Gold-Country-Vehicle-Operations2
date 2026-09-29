@@ -9,16 +9,16 @@ import { saleComplianceSummary } from "@/modules/documents/requirements";
 import { completeSaleAction } from "@/modules/documents/actions";
 import { SaleDocInputs } from "./sale-doc-inputs";
 import { DocChecklist } from "./doc-checklist";
+import { SignatureCard } from "./signature-card";
+import { signaturePanel } from "@/modules/esign/service";
 import {
   cancelSaleAction,
   deliverVehicleAction,
   fileDocumentAction,
   generateDocumentAction,
   markContractedAction,
-  markDocumentSignedAction,
   recordPaymentAction,
   releaseVehicleAction,
-  sendDocumentAction,
   setPaymentStatusAction,
 } from "@/modules/sales/actions";
 import { sanitizePartyForUser } from "@/modules/vehicles/sanitize";
@@ -30,11 +30,26 @@ export const metadata: Metadata = { title: "Deal" };
 const docTone = { GENERATED: "blue", SENT: "amber", PARTIALLY_SIGNED: "amber", SIGNED: "green", VOIDED: "neutral", FILED: "green" } as const;
 const payTone = { EXPECTED: "neutral", RECEIVED: "blue", CLEARED: "green", REFUNDED: "amber", FAILED: "red" } as const;
 
-export default async function SaleDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const DOC_ERRORS: Record<string, string> = {
+  nofile: "Choose a file to upload first.",
+  toolarge: "That file is larger than 25MB.",
+  notpdf: "That isn't a PDF. Save the filled-in form as a PDF (in Preview: File → Export as PDF) and upload that.",
+  notours: "Only documents the dealership produces take a filled-in copy.",
+  outforsignature: "That document is out for signature. Cancel the signature request first, then upload the corrected copy.",
+};
+
+export default async function SaleDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ docError?: string }>;
+}) {
   const user = await getSessionUser();
   if (!user) redirect("/login?expired=1");
   requirePermission(user, "view", "sales");
   const { id } = await params;
+  const { docError } = await searchParams;
 
   const sale = await db.saleTransaction.findUnique({
     where: { id },
@@ -51,7 +66,17 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
     db.documentTemplate.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
   ]);
   const buyer = sanitizePartyForUser(user, buyerRaw as unknown as Record<string, unknown>, "buyer_pii");
-  const [gate, compliance] = await Promise.all([releaseGate(sale.id), saleComplianceSummary(sale.id)]);
+  const [gate, compliance, esign, coBuyerRaw] = await Promise.all([
+    releaseGate(sale.id),
+    saleComplianceSummary(sale.id),
+    signaturePanel(sale.id),
+    sale.coBuyerPartyId ? db.party.findUnique({ where: { id: sale.coBuyerPartyId } }) : Promise.resolve(null),
+  ]);
+  // Buyer emails are buyer PII: shown only to roles that may see them, but a
+  // missing address is always flagged, since sending depends on it.
+  const seesBuyerPii = "email" in buyer;
+  const contact = (p: { displayName: string; email: string | null } | null) =>
+    p ? { name: p.displayName, email: p.email ? (seesBuyerPii ? p.email : "on file") : null } : null;
 
   const canEdit = hasPermission(user, "sales", "edit");
   const canPay = hasPermission(user, "payments", "create");
@@ -202,20 +227,6 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
                       <Badge tone={docTone[d.status]}>{d.status.toLowerCase().replace(/_/g, " ")}</Badge>
                       {open ? (
                         <>
-                          {d.status === "GENERATED" && canSendDocs ? (
-                            <form action={sendDocumentAction}>
-                              <input type="hidden" name="documentId" value={d.id} />
-                              <input type="hidden" name="saleId" value={sale.id} />
-                              <button className="rounded-md border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50">Send</button>
-                            </form>
-                          ) : null}
-                          {d.status === "SENT" && canEditDocs ? (
-                            <form action={markDocumentSignedAction}>
-                              <input type="hidden" name="documentId" value={d.id} />
-                              <input type="hidden" name="saleId" value={sale.id} />
-                              <button className="rounded-md border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50">Mark signed (mock)</button>
-                            </form>
-                          ) : null}
                           {d.status === "SIGNED" && canEditDocs ? (
                             <form action={fileDocumentAction}>
                               <input type="hidden" name="documentId" value={d.id} />
@@ -334,7 +345,44 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
           ) : null}
         </div>
 
+        {docError && DOC_ERRORS[docError] ? (
+          <p role="status" className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+            {DOC_ERRORS[docError]}
+          </p>
+        ) : null}
         <SaleDocInputs sale={sale} canEdit={canEdit && open} />
+        <SignatureCard
+          saleId={sale.id}
+          provider={esign.provider}
+          canSend={canSendDocs}
+          dealOpen={!["CANCELED", "UNWOUND", "COMPLETE"].includes(sale.status)}
+          buyer={contact(buyerRaw)!}
+          coBuyer={contact(coBuyerRaw)}
+          dealers={esign.dealers}
+          defaultDealerId={esign.dealers.find((d) => d.id === user.id)?.id ?? null}
+          candidates={esign.candidates.map((c) => ({ requirementId: c.requirementId, name: c.name, ready: c.ready, reason: c.reason }))}
+          latest={
+            esign.latest
+              ? {
+                  id: esign.latest.id,
+                  status: esign.latest.status,
+                  sentAt: esign.latest.sentAt.toISOString(),
+                  completedAt: esign.latest.completedAt?.toISOString() ?? null,
+                  endedReason: esign.latest.endedReason,
+                  lastError: esign.latest.lastError,
+                  signedFileId: esign.latest.signedFileId,
+                  auditFileId: esign.latest.auditFileId,
+                  documentCount: esign.latest.documentInstanceIds.length,
+                  signers: esign.latest.signers.map((s) => ({
+                    role: s.role,
+                    name: s.name,
+                    email: seesBuyerPii || s.role === "DEALER" ? s.email : "on file",
+                    signedAt: s.signedAt,
+                  })),
+                }
+              : null
+          }
+        />
         <DocChecklist
           saleId={sale.id}
           summary={compliance}

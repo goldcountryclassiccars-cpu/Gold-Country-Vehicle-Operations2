@@ -52,8 +52,11 @@ on the deal's checklist.
    compliance resource that the configured package satisfies current California DMV and
    dealer requirements (e.g., required disclosures, smog/emissions rules where applicable,
    FTC Used Car Rule / Buyers Guide applicability for the vehicles sold).
-9. **E-signature vendor selection** — which provider (if any) to integrate; the system
-   ships with a development mock and a provider-neutral adapter interface.
+9. **E-signature — BoldSign (chosen 2026-09-29).** The deal page's **Send for signature**
+   card sends every e-signable document the checklist requires, merged into one PDF, in one
+   envelope: buyer (and co-buyer) sign first, the chosen Admin countersigns as Dealer. Signed
+   steps tick themselves on the checklist, and on completion the signed packet and BoldSign's
+   signing certificate are filed on the deal. See **E-signature setup** below.
 10. **Consignor settlement deadline policy** — the number of days after sale funds clear
     within which consignors must be paid (configurable in Administration; the system does
     not hardcode a legal conclusion). The countdown now runs from **when the buyer's funds
@@ -64,10 +67,49 @@ on the deal's checklist.
     deliberately never committed to the repository or pasted into a transcript.
 12. **CARS Act cut-over confirmation** — the registry swaps the Contract Cancellation Option
     for the 3-Day Right to Cancel on 2026-10-01, with price ceilings of $40,000 and $50,000
-    respectively, and reads the cancellation window as ending at close of business on the
-    third calendar day after delivery. **Weekend and holiday handling is unconfirmed**, and
-    the statutory text of the new notice has to come from counsel/CADA — the app will not
-    draft it.
+    respectively. The cancellation window runs three calendar days starting the day after the
+    contract is signed and ends at close of business on day 3 (Civ. Code §1784.31(i)); if day 3
+    is a closed day it extends to the next open day, which staff set by hand. The dealership's
+    3-Day Right to Cancel disclosure was drafted 2026-09-29 from the chaptered text and still
+    needs counsel review.
+
+## E-signature setup (BoldSign)
+
+Until `ESIGN_ADAPTER="boldsign"` is set, the card runs in **practice mode**: nothing leaves
+the app. To connect BoldSign (sandbox first, live key once the paid API plan is on):
+
+1. In BoldSign → **API** → create an API key. In Vercel → Project → Settings → Environment
+   Variables, add `ESIGN_ADAPTER=boldsign` and `BOLDSIGN_API_KEY=<key>`. Redeploy.
+2. In BoldSign → **API → Webhooks**, add `https://gold-country-vehicle-operations2.vercel.app/api/esign/boldsign`,
+   tick the document events (Sent, Signed, Completed, Declined, Revoked, Expired), copy the
+   webhook's signing secret into Vercel as `BOLDSIGN_WEBHOOK_SECRET`, redeploy, then press
+   BoldSign's **Verify**. Without the webhook everything still works — staff press
+   **Check status** on the card instead.
+3. Load each document's approved PDF in **Administration → Documents**. With a live provider
+   the app refuses to send a watermarked demonstration copy to a real buyer.
+
+**Field-name convention for approved PDFs.** Name the fillable fields in the dealership's own
+PDFs like this and the app does the rest:
+
+| Field name | What happens |
+| --- | --- |
+| `SIG_BUYER`, `SIG_COBUYER`, `SIG_DEALER` | Becomes that signer's signature box. |
+| `DATE_BUYER`, `DATE_COBUYER`, `DATE_DEALER` | Date stamped when that person signs. |
+| `INIT_BUYER`, `INIT_BUYER_2`, … | Initials box. A trailing `_2`, `_3` allows more than one. |
+| `buyer.name`, `buyer.street`, `buyer.city`, `buyer.state`, `buyer.zip`, `buyer.phone`, `buyer.email`, `buyer.printedName` (and `cobuyer.*`) | Pre-filled from the deal when the document is produced. |
+| `vehicle.year`, `vehicle.make`, `vehicle.model`, `vehicle.vin`, `vehicle.odometer`, `vehicle.stockNumber`, `vehicle.bodyStyle`, `vehicle.exteriorColor`, `vehicle.interiorColor`, `vehicle.engine` | Pre-filled. |
+| `sale.date`, `sale.agreementNo`, `sale.salesperson`, `price.cashPrice`, `price.salesTax` | Pre-filled. |
+| `cancel3.lastDay`, `cancel3.restockingFee`, `cancel3.buyers`, `cancel3.odometerAtSigning`, checkboxes named `…QUALIFIES…` / `…DOES_NOT_QUALIFY…` | Pre-filled for sales that carry the 3-day right. |
+| `dealer.printedName` | Filled with the countersigning Admin's name at send time. |
+
+Anything else stays for staff to fill in (fees, trade-in, payment method): open the produced
+document, finish it in Preview or Acrobat, and **Upload filled copy** on its checklist row —
+that copy is what gets sent. Every form is flattened before sending, so a buyer cannot edit
+values in the signing screen. A PDF with no `SIG_` fields gets a plain signature page
+appended; a Word file cannot be e-signed (load a PDF).
+
+Boxes are placed in PDF points from the page's top-left. Confirm placement on the first
+sandbox send before switching to the live key.
 
 ## What the system does in the meantime
 

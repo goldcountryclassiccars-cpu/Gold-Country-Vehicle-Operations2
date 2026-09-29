@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/integration", "/api/health"];
+// /api/esign/boldsign authenticates by HMAC signature, not a session cookie.
+const PUBLIC_PATHS = ["/login", "/api/integration", "/api/health", "/api/esign/boldsign"];
 
 /**
  * Lightweight gate: redirects requests without a session cookie to /login.
