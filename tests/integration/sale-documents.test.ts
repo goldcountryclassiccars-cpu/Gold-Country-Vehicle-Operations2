@@ -419,6 +419,24 @@ describe("the consignor payout clock", () => {
     expect(window!.getTime()).toBeGreaterThan(delivered.getTime());
   });
 
+  it("starts the 3 days the day after signing, not delivery, and ends 6pm Pacific on day 3", () => {
+    // Signed Mon Oct 5, delivered Wed Oct 7: the window still ends Thu Oct 8.
+    const delivered = new Date("2026-10-07T10:00:00-07:00");
+    const window = cancellationWindowFrom(storeDay("2026-10-05"), delivered, 38500);
+    expect(window!.toISOString()).toBe(new Date("2026-10-08T18:00:00-07:00").toISOString());
+  });
+
+  it("uses standard time after the November clock change", () => {
+    const window = cancellationWindowFrom(storeDay("2026-11-02"), new Date("2026-11-02T10:00:00-08:00"), 20000);
+    expect(window!.toISOString()).toBe(new Date("2026-11-05T18:00:00-08:00").toISOString());
+  });
+
+  it("gives no window on a sale over $50,000", () => {
+    const delivered = new Date("2026-10-05T10:00:00-07:00");
+    expect(cancellationWindowFrom(storeDay("2026-10-05"), delivered, 50001)).toBeNull();
+    expect(cancellationWindowFrom(storeDay("2026-10-05"), delivered, 50000)).not.toBeNull();
+  });
+
   it("holds the payout while the buyer's funds have not cleared", async () => {
     const episode = await makeEpisode();
     const sale = await makeAnsweredSale(episode.id);

@@ -11,7 +11,7 @@ import { emitIntegrationEvent } from "@/modules/media/service";
 import { evaluateSaleRequirements, saleComplianceSummary } from "@/modules/documents/requirements";
 import { readManualAnswers } from "@/modules/documents/context";
 import type { Prisma } from "@prisma/client";
-import { dealershipDayString, readDay, storeDay } from "@/lib/dealership-date";
+import { DEALERSHIP_TIME_ZONE, dealershipDayString, readDay, storeDay } from "@/lib/dealership-date";
 
 export class SalesError extends Error {}
 
@@ -239,7 +239,8 @@ export async function deliverVehicle(user: SessionUser, saleId: string) {
       status: "DELIVERED",
       deliveredAt,
       deliveredToBuyerAt: sale.deliveredToBuyerAt ?? deliveredAt,
-      cancellationWindowEndsAt: sale.cancellationWindowEndsAt ?? cancellationWindowFrom(sale.saleDate, deliveredAt),
+      cancellationWindowEndsAt:
+        sale.cancellationWindowEndsAt ?? cancellationWindowFrom(sale.saleDate, deliveredAt, Number(sale.agreedPrice)),
     },
   });
   await changeEpisodeStatus(user, sale.episodeId, "sales", "DELIVERED", "Vehicle delivered");
@@ -254,20 +255,41 @@ export async function deliverVehicle(user: SessionUser, saleId: string) {
 }
 
 /**
- * CARS Act 3-day cancellation window, for sales on or after 2026-10-01.
+ * CARS Act 3-day cancellation window (Civ. Code §1784.31(i), §1784.43), for
+ * sales on or after 2026-10-01 at a price of $50,000 or less.
  *
- * Ends at close of business on the third calendar day after delivery. 18:00
- * local stands in for "close of business"; weekend and holiday handling still
- * needs confirming with counsel, which is why the field stays editable rather
- * than being computed and locked.
+ * The three calendar days start the day AFTER the contract is signed — not
+ * delivered — and end at close of business on the third day. The sale date is
+ * the signing day; with no sale date recorded, the delivery day stands in.
+ * 18:00 dealership time stands in for "close of business". The statute rolls
+ * the deadline to the next open day when day 3 falls on a closed day; that
+ * needs the dealership's hours, so the stored value stays editable rather than
+ * computed and locked.
  */
-export function cancellationWindowFrom(saleDate: Date | null, deliveredAt: Date): Date | null {
-  const effective = saleDate ? readDay(saleDate) : dealershipDayString(deliveredAt);
-  if (!effective || effective < "2026-10-01") return null;
-  const end = new Date(deliveredAt);
-  end.setDate(end.getDate() + 3);
-  end.setHours(18, 0, 0, 0);
-  return end;
+export function cancellationWindowFrom(
+  saleDate: Date | null,
+  deliveredAt: Date,
+  agreedPrice?: number | null,
+): Date | null {
+  const signedDay = saleDate ? readDay(saleDate) : dealershipDayString(deliveredAt);
+  if (!signedDay || signedDay < "2026-10-01") return null;
+  if (agreedPrice != null && agreedPrice > 50000) return null;
+  const day = new Date(`${signedDay}T12:00:00.000Z`);
+  day.setUTCDate(day.getUTCDate() + 3);
+  return dealershipInstant(day.toISOString().slice(0, 10), 18);
+}
+
+/** A wall-clock hour on a dealership day, as a real instant (DST-aware). */
+function dealershipInstant(day: string, hour: number): Date {
+  const offset =
+    new Intl.DateTimeFormat("en-US", { timeZone: DEALERSHIP_TIME_ZONE, timeZoneName: "shortOffset" })
+      .formatToParts(new Date(`${day}T12:00:00.000Z`))
+      .find((p) => p.type === "timeZoneName")?.value ?? "GMT-8";
+  const m = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(offset);
+  const sign = m?.[1] ?? "-";
+  const hh = (m?.[2] ?? "8").padStart(2, "0");
+  const mm = m?.[3] ?? "00";
+  return new Date(`${day}T${String(hour).padStart(2, "0")}:00:00${sign}${hh}:${mm}`);
 }
 
 /**

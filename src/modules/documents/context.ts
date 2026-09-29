@@ -98,7 +98,7 @@ export const SALE_INPUT_HINTS: Record<string, string> = {
   odometerAtSale: "Goes on the odometer disclosure and the REG 262.",
   salesTaxCollected: "Recorded for the REG 51. Leave blank only if no California tax is due.",
   cancellationWindowEndsAt:
-    "Nothing can be paid out to a consignor until this passes. Ends at close of business on the third calendar day after delivery.",
+    "Nothing can be paid out to a consignor until this passes. Ends at close of business on the third calendar day after the contract is signed (no window over $50,000).",
 };
 
 /** Extracts the manual answers blob, tolerating a null or malformed column. */

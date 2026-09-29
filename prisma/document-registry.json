@@ -123,8 +123,8 @@
       "signers": ["BUYER", "DEALER"],
       "eSign": true, "wetSignature": false, "physicalOriginal": false,
       "buyerCopy": true, "retain": true, "submitTo": null,
-      "sequencing": "Consignor settlement may not move to PAYABLE until cancellationWindowEndsAt has passed. Window ends at dealer close of business on the third calendar day after delivery (confirm holiday/weekend handling).",
-      "note": "Statutory title and content. Do not draft; obtain from counsel/CADA/Reynolds when published.",
+      "sequencing": "Consignor settlement may not move to PAYABLE until cancellationWindowEndsAt has passed. Window runs 3 calendar days starting the day after the contract is signed, ending at dealer close of business on day 3; extends to the next open day if day 3 is a closed day. No window over $50,000, for motorcycles, or once driven 400+ miles.",
+      "note": "Statutory title and content (Civ. Code 1784.43(b)). GCCC form drafted 2026-09-29 from the chaptered text; load it via Administration > Documents. Counsel review still pending.",
       "verify": true
     },
     {

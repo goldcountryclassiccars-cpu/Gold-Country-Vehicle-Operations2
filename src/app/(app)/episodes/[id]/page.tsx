@@ -21,6 +21,7 @@ import { Badge, Card, DescriptionList, PageHeader, inputClass } from "@/componen
 import { intakeReadiness } from "@/modules/documents/intake";
 import { markIntakeOnFileAction, produceIntakeDocumentAction } from "@/modules/documents/actions";
 import { consignorPayoutClock } from "@/modules/settlements/service";
+import { dealershipTimeString } from "@/lib/dealership-date";
 
 export const metadata: Metadata = { title: "Episode" };
 
@@ -228,7 +229,7 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
           ) : null}
           {payoutClock.cancellationWindowEndsAt ? (
             <p className="mt-1 text-xs text-stone-500">
-              Buyer cancellation window ends {payoutClock.cancellationWindowEndsAt.toLocaleString()}.
+              Buyer cancellation window ends {dealershipTimeString(payoutClock.cancellationWindowEndsAt)}.
             </p>
           ) : null}
         </Card>
