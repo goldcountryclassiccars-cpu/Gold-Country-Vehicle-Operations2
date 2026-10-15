@@ -19,6 +19,8 @@ import {
 } from "@/modules/episodes/actions";
 import { Badge, Card, DescriptionList, PageHeader, inputClass } from "@/components/ui";
 import { intakeReadiness } from "@/modules/documents/intake";
+import { librarySent } from "@/modules/library/service";
+import { SentList } from "@/app/(app)/documents/library/sent-list";
 import { markIntakeOnFileAction, produceIntakeDocumentAction } from "@/modules/documents/actions";
 import { consignorPayoutClock } from "@/modules/settlements/service";
 import { dealershipTimeString } from "@/lib/dealership-date";
@@ -52,11 +54,13 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
   const assigned = [episode.salespersonId, episode.operationsOwnerId].filter(Boolean) as string[];
   if (!authorize(user, "view", "episodes", { assignedUserIds: assigned })) notFound();
 
-  const [readiness, payoutClock] = await Promise.all([
+  const [readiness, payoutClock, librarySends] = await Promise.all([
     intakeReadiness(episode.id),
     episode.dealType === "CONSIGNMENT" ? consignorPayoutClock(episode.id) : null,
+    hasPermission(user, "documents", "view") ? librarySent({ episodeId: episode.id, take: 20 }) : Promise.resolve([]),
   ]);
   const canGenerateDocs = hasPermission(user, "documents", "generate");
+  const canSendDocs = hasPermission(user, "documents", "send");
 
   const [source, location, history, seller] = await Promise.all([
     episode.acquisitionSourceId
@@ -109,9 +113,16 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
         <Card accent={readiness.ready ? "green" : "amber"} className="mb-6">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold text-stone-900">Paperwork needed before this car is sold</h2>
-            <Badge tone={readiness.ready ? "green" : "amber"}>
-              {readiness.ready ? "nothing outstanding" : `${readiness.blockers.length} outstanding`}
-            </Badge>
+            <span className="flex items-center gap-2">
+              {canSendDocs ? (
+                <Link href={`/documents/library?vehicle=${episode.id}`} className="text-sm font-medium text-brand-700 hover:underline">
+                  Send a form →
+                </Link>
+              ) : null}
+              <Badge tone={readiness.ready ? "green" : "amber"}>
+                {readiness.ready ? "nothing outstanding" : `${readiness.blockers.length} outstanding`}
+              </Badge>
+            </span>
           </div>
           <ul className="space-y-2">
             {readiness.items.map((item) => {
@@ -210,6 +221,13 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
               );
             })}
           </ul>
+        </Card>
+      ) : null}
+
+      {librarySends.length > 0 ? (
+        <Card className="mb-6">
+          <h2 className="mb-3 text-base font-semibold text-stone-900">Documents sent for this car</h2>
+          <SentList items={librarySends} canSend={canSendDocs} />
         </Card>
       ) : null}
 

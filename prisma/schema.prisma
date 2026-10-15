@@ -1112,6 +1112,16 @@ enum DocumentTiming {
 // compliance fields below drive the checklist and are already authoritative.
 //
 // Seeded from prisma/document-registry.json by seed-document-registry.ts.
+enum JourneyStage {
+  LEAD
+  HOLD_DEPOSIT
+  CONTRACT
+  CLOSING
+  DELIVERY
+  CONSIGN_INTAKE
+  CONSIGN_SETTLEMENT
+}
+
 model DocumentTemplate {
   id                   String  @id @default(uuid())
   key                  String  @unique
@@ -1142,6 +1152,11 @@ model DocumentTemplate {
   notes             String?
   /// True until dealer counsel has confirmed the rule and thresholds.
   verifyWithCounsel Boolean        @default(false)
+  /// Where in the buyer's or consignor's journey this document belongs (library grouping).
+  journeyStage      JourneyStage   @default(CONTRACT)
+  /// May be sent from the Document Library to a contact with no sale open —
+  /// an Intent to Purchase to a lead, a title addendum to a consignor.
+  sendableStandalone Boolean       @default(false)
 
   // --- The dealership's own approved document, uploaded through Administration.
   //
@@ -1238,6 +1253,9 @@ model DocumentInstance {
   status             DocumentStatus   @default(GENERATED)
   fileId             String // signed_docs sensitivity on the FileObject
   envelopeExternalId String?
+  /// Recipient of a standalone (no-sale) send from the Document Library.
+  partyId            String?
+  sentVia            DocumentSentVia?
   generatedById      String
   sentAt             DateTime?
   signedAt           DateTime?
@@ -1246,6 +1264,13 @@ model DocumentInstance {
 
   @@index([episodeId])
   @@index([saleId])
+  @@index([partyId])
+}
+
+enum DocumentSentVia {
+  ESIGN
+  EMAIL_PDF
+  PRINTED
 }
 
 enum SignatureEnvelopeStatus {
@@ -1262,8 +1287,12 @@ enum SignatureEnvelopeStatus {
 // only prompts a re-read of it (modules/esign/service.ts).
 model SignatureEnvelope {
   id                  String                  @id @default(uuid())
-  sale                SaleTransaction         @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  saleId              String
+  sale                SaleTransaction?        @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId              String?
+  /// Set on every envelope; the only link for a standalone Library send.
+  episodeId           String?
+  /// Recipient of a standalone send (no sale).
+  partyId             String?
   provider            String // "mock" | "boldsign"
   externalId          String                  @unique
   status              SignatureEnvelopeStatus @default(SENT)
@@ -1272,7 +1301,7 @@ model SignatureEnvelope {
   requirementIds      String[]
   /// DocumentInstance versions that went out, in packet order.
   documentInstanceIds String[]
-  /// [{ role: "BUYER"|"CO_BUYER"|"DEALER", name, email, order, signedAt }]
+  /// [{ role: "BUYER"|"CO_BUYER"|"CONSIGNOR"|"DEALER", name, email, order, signedAt }]
   signers             Json
   sentById            String
   sentAt              DateTime                @default(now())
@@ -1288,6 +1317,7 @@ model SignatureEnvelope {
   updatedAt           DateTime                @updatedAt
 
   @@index([saleId])
+  @@index([episodeId])
 }
 
 // ===========================================================================

@@ -15,7 +15,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "@/lib/config";
 
-export type SignerRole = "BUYER" | "CO_BUYER" | "DEALER";
+export type SignerRole = "BUYER" | "CO_BUYER" | "CONSIGNOR" | "DEALER";
 
 export type FieldType = "Signature" | "DateSigned" | "Initial";
 

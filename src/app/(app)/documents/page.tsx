@@ -38,7 +38,18 @@ export default async function DocumentsPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader title="Documents" subtitle="Generated sales documents, their versions and signature status." />
+      <PageHeader
+        title="Documents"
+        subtitle="Generated sales documents, their versions and signature status."
+        actions={
+          <Link
+            href="/documents/library"
+            className="inline-flex min-h-11 items-center rounded-lg border border-brand-800 bg-brand-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-800"
+          >
+            Document Library — send a form
+          </Link>
+        }
+      />
 
       <Card className="mb-6" accent={setup.templatesApproved > 0 ? "green" : "amber"}>
         {setup.templatesApproved === 0 ? (

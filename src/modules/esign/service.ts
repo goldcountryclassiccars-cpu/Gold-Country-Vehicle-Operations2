@@ -246,6 +246,7 @@ export async function sendForSignature(
   const envelope = await db.signatureEnvelope.create({
     data: {
       saleId,
+      episodeId: sale.episodeId,
       provider: signingProvider().name,
       externalId,
       title,
@@ -283,8 +284,15 @@ export async function sendForSignature(
 // Status
 // ---------------------------------------------------------------------------
 
-function readSigners(json: unknown): EnvelopeSigner[] {
+export function readSigners(json: unknown): EnvelopeSigner[] {
   return Array.isArray(json) ? (json as EnvelopeSigner[]) : [];
+}
+
+/** What an envelope's audit events hang on: the sale, or for a Library send, the car. */
+function envelopeResource(env: { saleId: string | null; episodeId: string | null; id: string }) {
+  return env.saleId
+    ? { resourceType: "sale", resourceId: env.saleId }
+    : { resourceType: "episode", resourceId: env.episodeId ?? env.id };
 }
 
 /**
@@ -314,17 +322,21 @@ export async function syncEnvelope(envelopeId: string, actor: SessionUser | null
   const completed = st.state === "completed";
   const signedRoles = new Set(signers.filter((s) => s.signedAt || completed).map((s) => s.role));
   const buyerSideDone = signers.filter((s) => BUYER_SIDE.includes(s.role)).every((s) => signedRoles.has(s.role));
+  const consignorDone = signers.some((s) => s.role === "CONSIGNOR") && signedRoles.has("CONSIGNOR");
   const dealerDone = signers.some((s) => s.role === "DEALER") && signedRoles.has("DEALER");
 
-  // Checklist ticks
-  const rows = await db.saleDocumentRequirement.findMany({
-    where: { id: { in: env.requirementIds } },
-    include: { template: true },
-  });
+  // Checklist ticks (a Library send with no sale has no checklist rows).
+  const rows = env.requirementIds.length
+    ? await db.saleDocumentRequirement.findMany({
+        where: { id: { in: env.requirementIds } },
+        include: { template: true },
+      })
+    : [];
   const ticked: string[] = [];
   for (const r of rows) {
-    const data: { buyerSigned?: boolean; dealerSigned?: boolean } = {};
+    const data: { buyerSigned?: boolean; dealerSigned?: boolean; consignorSigned?: boolean } = {};
     if (buyerSideDone && !r.buyerSigned && r.template.signers.some((s) => s === "BUYER" || s === "CO_BUYER")) data.buyerSigned = true;
+    if (consignorDone && !r.consignorSigned && r.template.signers.includes("CONSIGNOR")) data.consignorSigned = true;
     if (dealerDone && !r.dealerSigned && r.template.signers.includes("DEALER")) data.dealerSigned = true;
     if (Object.keys(data).length) {
       await db.saleDocumentRequirement.update({ where: { id: r.id }, data });
@@ -339,7 +351,9 @@ export async function syncEnvelope(envelopeId: string, actor: SessionUser | null
 
   if (completed) {
     if (!env.signedFileId) {
-      const sale = await db.saleTransaction.findUniqueOrThrow({ where: { id: env.saleId } });
+      const episodeId =
+        env.episodeId ??
+        (env.saleId ? (await db.saleTransaction.findUniqueOrThrow({ where: { id: env.saleId } })).episodeId : "unlinked");
       let signed: Buffer, trail: Buffer;
       try {
         [signed, trail] = await Promise.all([
@@ -361,7 +375,7 @@ export async function syncEnvelope(envelopeId: string, actor: SessionUser | null
           { data: signed, name: "signed" },
           { data: trail, name: "audit-trail" },
         ].map(async ({ data, name }) => {
-          const storageKey = `documents/${sale.episodeId}/esign-${env.id}-${name}.pdf`;
+          const storageKey = `documents/${episodeId}/esign-${env.id}-${name}.pdf`;
           await storage().put(storageKey, data);
           return db.fileObject.create({
             data: {
@@ -408,8 +422,7 @@ export async function syncEnvelope(envelopeId: string, actor: SessionUser | null
   if (status !== env.status || ticked.length) {
     await audit(actor, {
       action: "esign.status",
-      resourceType: "sale",
-      resourceId: env.saleId,
+      ...envelopeResource(env),
       newValues: { envelopeId: env.id, status, ticked },
       ...(actor ? {} : { source: "integration" as const, integration: env.provider }),
     });
@@ -442,7 +455,7 @@ export async function cancelEnvelope(user: SessionUser, envelopeId: string, reas
     where: { id: env.id },
     data: { status: "CANCELED", endedAt: new Date(), endedReason: why },
   });
-  await audit(user, { action: "esign.cancel", resourceType: "sale", resourceId: env.saleId, reason: why, newValues: { envelopeId: env.id } });
+  await audit(user, { action: "esign.cancel", ...envelopeResource(env), reason: why, newValues: { envelopeId: env.id } });
   return saved;
 }
 

@@ -17,7 +17,7 @@
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { PrismaClient, type DocumentTiming, type Prisma } from "@prisma/client";
+import { PrismaClient, type DocumentTiming, type JourneyStage, type Prisma } from "@prisma/client";
 
 const db = new PrismaClient();
 
@@ -51,6 +51,10 @@ interface RegistryDocument {
   tracked?: string[];
   captures?: string[];
   linkedCollect?: string[];
+  journeyStage?: string;
+  sendableStandalone?: boolean;
+  /** false = seeded but not offered anywhere (a draft awaiting counsel). */
+  active?: boolean;
 }
 
 interface Registry {
@@ -112,6 +116,12 @@ function legacyAppliesTo(rule: unknown): string {
   return "all";
 }
 
+const JOURNEY_STAGES: JourneyStage[] = ["LEAD", "HOLD_DEPOSIT", "CONTRACT", "CLOSING", "DELIVERY", "CONSIGN_INTAKE", "CONSIGN_SETTLEMENT"];
+
+function journeyStage(raw: string | undefined): JourneyStage {
+  return (JOURNEY_STAGES as string[]).includes(raw ?? "") ? (raw as JourneyStage) : "CONTRACT";
+}
+
 function asDate(v: string | null | undefined): Date | null {
   return v ? new Date(`${v}T00:00:00.000Z`) : null;
 }
@@ -131,7 +141,7 @@ export function planTemplates(registry: Registry): PlannedTemplate[] {
       name: doc.name,
       appliesTo: legacyAppliesTo(doc.appliesWhen),
       requiresWetSignature: doc.wetSignature ?? false,
-      active: true,
+      active: doc.active ?? true,
       sortOrder: doc.category * 100 + index,
       category: doc.category,
       authority: doc.authority ?? null,
@@ -146,6 +156,8 @@ export function planTemplates(registry: Registry): PlannedTemplate[] {
       worksheetFields: worksheetFields(doc),
       notes: collectNotes(doc, timingNote),
       verifyWithCounsel: doc.verify ?? false,
+      journeyStage: journeyStage(doc.journeyStage),
+      sendableStandalone: doc.sendableStandalone ?? false,
     };
 
     if (!doc.versions || doc.versions.length === 0) {

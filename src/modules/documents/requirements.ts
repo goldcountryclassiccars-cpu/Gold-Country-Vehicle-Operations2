@@ -137,6 +137,14 @@ export async function evaluateSaleRequirements(user: SessionUser | null, saleId:
   });
   const intakeFiledByTemplate = new Map(intakeFiled.map((i) => [i.templateId, i]));
 
+  // Documents signed through the Library before the deal opened (an Intent to
+  // Purchase, a title addendum) and linked to this sale by `adoptLibraryDocuments`.
+  const libraryFiled = await db.documentInstance.findMany({
+    where: { saleId, partyId: { not: null }, status: { in: ["SIGNED", "FILED"] } },
+    orderBy: { version: "asc" },
+  });
+  const libraryFiledByTemplate = new Map(libraryFiled.map((i) => [i.templateId, i]));
+
   const changes: { key: string; from: string | null; to: RequirementState }[] = [];
 
   for (const result of results) {
@@ -169,9 +177,11 @@ export async function evaluateSaleRequirements(user: SessionUser | null, saleId:
       template.timing === "INTAKE" && !progress.documentInstanceId
         ? intakeFiledByTemplate.get(template.id)
         : undefined;
+    const libraryInstance = !progress.documentInstanceId && !intakeInstance ? libraryFiledByTemplate.get(template.id) : undefined;
     let adopted: Partial<{
       documentInstanceId: string;
       filedAt: Date;
+      buyerSigned: boolean;
       dealerSigned: boolean;
       consignorSigned: boolean;
       prefillAvailable: boolean;
@@ -185,6 +195,22 @@ export async function evaluateSaleRequirements(user: SessionUser | null, saleId:
       adopted = {
         documentInstanceId: progress.documentInstanceId,
         filedAt: progress.filedAt,
+        dealerSigned: progress.dealerSigned,
+        consignorSigned: progress.consignorSigned,
+        prefillAvailable: true,
+        readyForSignature: true,
+      };
+    } else if (libraryInstance) {
+      // Everyone the document lists signed it through the Library envelope.
+      progress.documentInstanceId = libraryInstance.id;
+      progress.filedAt = libraryInstance.filedAt ?? libraryInstance.signedAt ?? libraryInstance.createdAt;
+      if (template.signers.some((r) => r === "BUYER" || r === "CO_BUYER")) progress.buyerSigned = true;
+      if (template.signers.includes("DEALER")) progress.dealerSigned = true;
+      if (template.signers.includes("CONSIGNOR")) progress.consignorSigned = true;
+      adopted = {
+        documentInstanceId: progress.documentInstanceId,
+        filedAt: progress.filedAt,
+        buyerSigned: progress.buyerSigned,
         dealerSigned: progress.dealerSigned,
         consignorSigned: progress.consignorSigned,
         prefillAvailable: true,

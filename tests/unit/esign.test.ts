@@ -312,3 +312,49 @@ describe("pre-filling the dealership's forms", () => {
     expect(await applyPrefill(bytes, prefillValues(base), true)).toBe(bytes);
   });
 });
+
+describe("consignor signature fields and odometer boxes", () => {
+  it("finds SIG_CONSIGNOR / DATE_CONSIGNOR and keeps them off the buyer's list", async () => {
+    const { PDFDocument } = await import("pdf-lib");
+    const { findSignatureFields, buildPacket } = await import("@/modules/esign/packet");
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([612, 792]);
+    const form = pdf.getForm();
+    form.createTextField("SIG_CONSIGNOR").addToPage(page, { x: 60, y: 200, width: 220, height: 28 });
+    form.createTextField("DATE_CONSIGNOR").addToPage(page, { x: 320, y: 200, width: 120, height: 18 });
+    form.createTextField("SIG_DEALER").addToPage(page, { x: 60, y: 100, width: 220, height: 28 });
+    const found = findSignatureFields(pdf);
+    expect(found.map((f) => `${f.role}:${f.field.type}`).sort()).toEqual(["CONSIGNOR:DateSigned", "CONSIGNOR:Signature", "DEALER:Signature"]);
+
+    const bytes = Buffer.from(await pdf.save());
+    const packet = await buildPacket(
+      [{ title: "Addendum", bytes, contentType: "application/pdf", signers: ["CONSIGNOR", "DEALER"] }],
+      new Set(["CONSIGNOR", "DEALER"]),
+    );
+    expect(packet.fields.CONSIGNOR).toHaveLength(2);
+    expect(packet.fields.DEALER).toHaveLength(1);
+    expect(packet.fields.BUYER).toHaveLength(0);
+  });
+
+  it("ticks the odometer box the vehicle record says, and none for UNKNOWN", async () => {
+    const { PDFDocument } = await import("pdf-lib");
+    const { applyPrefill } = await import("@/modules/esign/prefill");
+    const make = async () => {
+      const pdf = await PDFDocument.create();
+      const page = pdf.addPage([612, 792]);
+      const form = pdf.getForm();
+      for (const n of ["ACTUAL", "NOT_ACTUAL", "EXCEEDS", "EXEMPT"]) {
+        form.createCheckBox(`odometer.${n}`).addToPage(page, { x: 60, y: 700 - 30 * n.length, width: 12, height: 12 });
+      }
+      form.createTextField("consignor.name").addToPage(page, { x: 60, y: 500, width: 200, height: 18 });
+      return Buffer.from(await pdf.save());
+    };
+    const checked = async (bytes: Buffer) => {
+      const f = (await PDFDocument.load(bytes)).getForm();
+      return ["ACTUAL", "NOT_ACTUAL", "EXCEEDS", "EXEMPT"].filter((n) => f.getCheckBox(`odometer.${n}`).isChecked());
+    };
+    expect(await checked(await applyPrefill(await make(), { "consignor.name": "A" }, null, "EXEMPT"))).toEqual(["EXEMPT"]);
+    expect(await checked(await applyPrefill(await make(), { "consignor.name": "A" }, null, "TMU"))).toEqual(["NOT_ACTUAL"]);
+    expect(await checked(await applyPrefill(await make(), { "consignor.name": "A" }, null, "UNKNOWN"))).toEqual([]);
+  });
+});

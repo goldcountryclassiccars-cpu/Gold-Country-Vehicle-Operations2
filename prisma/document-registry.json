@@ -1,6 +1,6 @@
 {
   "$schema_note": "Seed data for the sale-document compliance checklist. NOT LEGAL ADVICE: every rule and threshold marked verify=true must be confirmed by dealer counsel or a CADA/IADAC compliance resource before production use. Rule syntax: {\"all\":[...]} / {\"any\":[...]} / {\"not\":{...}} / {\"field\":\"<path>\",\"op\":\"<op>\",\"value\":<v>}. ops: eq, neq, lt, lte, gt, gte, in, exists, missing. Fields resolve against the context object described in `context`.",
-  "version": "2026-09-05",
+  "version": "2026-10-15",
   "context": {
     "vehicle.year": "Vehicle.year",
     "vehicle.mileageStatus": "Vehicle.mileageStatus (ACTUAL|EXEMPT|NOT_ACTUAL|TMU|BROKEN_ODOMETER|UNKNOWN)",
@@ -37,60 +37,141 @@
       "name": "Retail Purchase Agreement / Buyer's Order",
       "category": 1,
       "authority": "Dealer document; must carry CARS Act price/add-on disclosures on/after 2026-10-01",
-      "appliesWhen": { "field": "sale.agreedPrice", "op": "exists" },
-      "signers": ["BUYER", "CO_BUYER", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
-      "versions": [
-        { "templateKey": "purchase_agreement_v1", "effectiveFrom": null, "effectiveTo": "2026-09-30" },
-        { "templateKey": "purchase_agreement_v2_cars", "effectiveFrom": "2026-10-01", "effectiveTo": null, "note": "Adds total-price disclosure, add-on optionality statement (12-pt), cancellation reference" }
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "signers": [
+        "BUYER",
+        "CO_BUYER",
+        "DEALER"
       ],
-      "verify": true
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
+      "versions": [
+        {
+          "templateKey": "purchase_agreement_v1",
+          "effectiveFrom": null,
+          "effectiveTo": "2026-09-30"
+        },
+        {
+          "templateKey": "purchase_agreement_v2_cars",
+          "effectiveFrom": "2026-10-01",
+          "effectiveTo": null,
+          "note": "Adds total-price disclosure, add-on optionality statement (12-pt), cancellation reference"
+        }
+      ],
+      "verify": true,
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "due_bill",
       "name": "Due Bill / We-Owe Agreement",
       "category": 1,
       "authority": "Dealer document",
-      "appliesWhen": { "field": "sale.hasDueBillItems", "op": "eq", "value": true },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
-      "note": "Generate a signed 'nothing owed' version when there are no items, so the file always answers the question."
+      "appliesWhen": {
+        "field": "sale.hasDueBillItems",
+        "op": "eq",
+        "value": true
+      },
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
+      "note": "Generate a signed 'nothing owed' version when there are no items, so the file always answers the question.",
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "buyers_guide",
       "name": "FTC Used Car Buyers Guide (window form + signed copy)",
       "category": 1,
       "authority": "16 CFR Part 455",
-      "appliesWhen": { "field": "vehicle.isMotorcycle", "op": "neq", "value": true },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
-      "prefill": ["vehicle.year", "vehicle.make", "vehicle.model", "vehicle.vin", "dealer.legalName", "dealer.address", "asIs|warranty"],
+      "appliesWhen": {
+        "field": "vehicle.isMotorcycle",
+        "op": "neq",
+        "value": true
+      },
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
+      "prefill": [
+        "vehicle.year",
+        "vehicle.make",
+        "vehicle.model",
+        "vehicle.vin",
+        "dealer.legalName",
+        "dealer.address",
+        "asIs|warranty"
+      ],
       "note": "Must be displayed on the vehicle before sale, not only signed at closing. Motorcycles are outside the FTC rule; verify treatment of pre-1966/kit vehicles.",
-      "verify": true
+      "verify": true,
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "buyers_guide_spanish",
       "name": "FTC Buyers Guide - Spanish version",
       "category": 1,
       "authority": "16 CFR 455.5",
-      "appliesWhen": { "field": "sale.negotiatedLanguage", "op": "eq", "value": "ES" },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null
+      "appliesWhen": {
+        "field": "sale.negotiatedLanguage",
+        "op": "eq",
+        "value": "ES"
+      },
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "as_is_acknowledgment",
       "name": "As-Is / Warranty Acknowledgment",
       "category": 1,
       "authority": "Dealer document",
-      "appliesWhen": { "field": "sale.agreedPrice", "op": "exists" },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
-      "note": "Optional if the Buyers Guide and purchase agreement already say it. Keep as a template slot; dealer decides."
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
+      "note": "Optional if the Buyers Guide and purchase agreement already say it. Keep as a template slot; dealer decides.",
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "contract_cancellation_option",
@@ -99,15 +180,32 @@
       "authority": "Cal. Veh. Code 11713.21 (pre-CARS Act version)",
       "appliesWhen": {
         "all": [
-          { "field": "sale.saleDate", "op": "lt", "value": "2026-10-01" },
-          { "field": "sale.agreedPrice", "op": "lt", "value": 40000 }
+          {
+            "field": "sale.saleDate",
+            "op": "lt",
+            "value": "2026-10-01"
+          },
+          {
+            "field": "sale.agreedPrice",
+            "op": "lt",
+            "value": 40000
+          }
         ]
       },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
       "note": "Dealer must OFFER it; buyer may accept or decline. Record the election and any option fee. Two-day window, mileage cap, restocking rules per statute.",
-      "verify": true
+      "verify": true,
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "three_day_right_to_cancel",
@@ -116,16 +214,32 @@
       "authority": "SB 766 / Cal. Civ. Code Title 1.5B (eff. 2026-10-01)",
       "appliesWhen": {
         "all": [
-          { "field": "sale.saleDate", "op": "gte", "value": "2026-10-01" },
-          { "field": "sale.agreedPrice", "op": "lte", "value": 50000 }
+          {
+            "field": "sale.saleDate",
+            "op": "gte",
+            "value": "2026-10-01"
+          },
+          {
+            "field": "sale.agreedPrice",
+            "op": "lte",
+            "value": 50000
+          }
         ]
       },
-      "signers": ["BUYER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
+      "signers": [
+        "BUYER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
       "sequencing": "Consignor settlement may not move to PAYABLE until cancellationWindowEndsAt has passed. Window runs 3 calendar days starting the day after the contract is signed, ending at dealer close of business on day 3; extends to the next open day if day 3 is a closed day. No window over $50,000, for motorcycles, or once driven 400+ miles.",
       "note": "Statutory title and content (Civ. Code 1784.43(b)). GCCC form drafted 2026-09-29 from the chaptered text; load it via Administration > Documents. Buyer acknowledges receipt; the form has no dealer signature line. Counsel review still pending.",
-      "verify": true
+      "verify": true,
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "add_on_disclosure",
@@ -134,73 +248,151 @@
       "authority": "SB 766",
       "appliesWhen": {
         "all": [
-          { "field": "sale.saleDate", "op": "gte", "value": "2026-10-01" },
-          { "field": "sale.hasAddOns", "op": "eq", "value": true }
+          {
+            "field": "sale.saleDate",
+            "op": "gte",
+            "value": "2026-10-01"
+          },
+          {
+            "field": "sale.hasAddOns",
+            "op": "eq",
+            "value": true
+          }
         ]
       },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
       "note": "12-point type, delivered before signing. Rarely triggered for this dealership; keep the rule so it cannot be forgotten.",
-      "verify": true
+      "verify": true,
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "title_brand_disclosure",
       "name": "Title Brand / Prior-Use Disclosure (salvage, flood, lemon buyback, prior rental/fleet)",
       "category": 1,
       "authority": "Cal. Veh. Code 11713.26 (NMVTIS brand warning); Civ. Code 1793.23-.24 (buyback)",
-      "appliesWhen": { "field": "vehicle.titleBrand", "op": "exists" },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
+      "appliesWhen": {
+        "field": "vehicle.titleBrand",
+        "op": "exists"
+      },
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
       "note": "Also requires a red warning sticker on the vehicle while displayed for sale when NMVTIS reports a brand.",
-      "verify": true
+      "verify": true,
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "buyer_receipt",
       "name": "Buyer Receipt / Transaction Summary",
       "category": 1,
       "authority": "Dealer document",
-      "appliesWhen": { "field": "sale.agreedPrice", "op": "exists" },
-      "signers": ["DEALER"],
-      "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
-      "note": "Optional per spec. Useful for out-of-state buyers whose DMV asks for proof of tax paid/not paid."
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "signers": [
+        "DEALER"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
+      "note": "Optional per spec. Useful for out-of-state buyers whose DMV asks for proof of tax paid/not paid.",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "out_of_state_bill_of_sale",
       "name": "Bill of Sale for Buyer's Home-State DMV",
       "category": 1,
       "authority": "Destination-state requirement",
-      "appliesWhen": { "field": "sale.registrationState", "op": "neq", "value": "CA" },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": true,
-      "buyerCopy": true, "retain": true, "submitTo": null,
-      "note": "Some states require notarization. Keep a per-state override table (notary required, own odometer form, title must be signed in ink)."
+      "appliesWhen": {
+        "field": "sale.registrationState",
+        "op": "neq",
+        "value": "CA"
+      },
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": true,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
+      "note": "Some states require notarization. Keep a per-state override table (notary required, own odometer form, title must be signed in ink).",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "consignment_agreement",
       "name": "Consignment Agreement",
       "category": 1,
       "authority": "Cal. Veh. Code 11729-11730",
-      "appliesWhen": { "field": "episode.dealType", "op": "eq", "value": "CONSIGNMENT" },
-      "signers": ["CONSIGNOR", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": false, "retain": true, "submitTo": null,
+      "appliesWhen": {
+        "field": "episode.dealType",
+        "op": "eq",
+        "value": "CONSIGNMENT"
+      },
+      "signers": [
+        "CONSIGNOR",
+        "DEALER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": null,
       "timing": "INTAKE - must exist before the vehicle is offered for sale; checklist shows it as already-complete or blocking at sale time.",
-      "verify": true
+      "verify": true,
+      "journeyStage": "CONSIGN_INTAKE",
+      "sendableStandalone": true
     },
     {
       "key": "consignor_settlement",
       "name": "Consignor Settlement / Accounting Statement",
       "category": 1,
       "authority": "Cal. Veh. Code 11729 (written accounting)",
-      "appliesWhen": { "field": "episode.dealType", "op": "eq", "value": "CONSIGNMENT" },
-      "signers": ["DEALER"],
-      "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": false, "retain": true, "submitTo": "CONSIGNOR",
+      "appliesWhen": {
+        "field": "episode.dealType",
+        "op": "eq",
+        "value": "CONSIGNMENT"
+      },
+      "signers": [
+        "DEALER"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": "CONSIGNOR",
       "sequencing": "Generated after funds clear and after any cancellation window closes. Deadline tracker uses AppSetting consignorPayoutDays (already configurable).",
-      "verify": true
+      "verify": true,
+      "journeyStage": "CONSIGN_SETTLEMENT",
+      "sendableStandalone": false
     },
     {
       "key": "consignor_lien_payoff_authorization",
@@ -209,13 +401,34 @@
       "authority": "Dealer document",
       "appliesWhen": {
         "all": [
-          { "field": "episode.dealType", "op": "eq", "value": "CONSIGNMENT" },
-          { "field": "arrangement.lienStatus", "op": "in", "value": ["lien", "open", "active"] }
+          {
+            "field": "episode.dealType",
+            "op": "eq",
+            "value": "CONSIGNMENT"
+          },
+          {
+            "field": "arrangement.lienStatus",
+            "op": "in",
+            "value": [
+              "lien",
+              "open",
+              "active"
+            ]
+          }
         ]
       },
-      "signers": ["CONSIGNOR", "DEALER"],
-      "eSign": true, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": false, "retain": true, "submitTo": null
+      "signers": [
+        "CONSIGNOR",
+        "DEALER"
+      ],
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": null,
+      "journeyStage": "CONSIGN_INTAKE",
+      "sendableStandalone": true
     },
     {
       "key": "reg_256_statement_of_facts",
@@ -224,17 +437,52 @@
       "authority": "CA DMV",
       "appliesWhen": {
         "any": [
-          { "field": "smog.exemptionClaimed", "op": "eq", "value": true },
-          { "field": "sale.deliveryState", "op": "neq", "value": "CA" },
-          { "field": "vehicle.mileageStatus", "op": "in", "value": ["NOT_ACTUAL", "TMU", "BROKEN_ODOMETER"] },
-          { "field": "manual.reg256Needed", "op": "eq", "value": true }
+          {
+            "field": "smog.exemptionClaimed",
+            "op": "eq",
+            "value": true
+          },
+          {
+            "field": "sale.deliveryState",
+            "op": "neq",
+            "value": "CA"
+          },
+          {
+            "field": "vehicle.mileageStatus",
+            "op": "in",
+            "value": [
+              "NOT_ACTUAL",
+              "TMU",
+              "BROKEN_ODOMETER"
+            ]
+          },
+          {
+            "field": "manual.reg256Needed",
+            "op": "eq",
+            "value": true
+          }
         ]
       },
-      "signers": ["BUYER"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": true,
-      "buyerCopy": false, "retain": true, "submitTo": "DMV",
-      "prefill": ["vehicle.vin", "vehicle.year", "vehicle.make", "plate", "buyer.name", "buyer.address"],
-      "note": "Signer depends on the statement being made; usually buyer (use tax, smog exemption). Employee should be able to add one manually with a reason."
+      "signers": [
+        "BUYER"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": true,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": "DMV",
+      "prefill": [
+        "vehicle.vin",
+        "vehicle.year",
+        "vehicle.make",
+        "plate",
+        "buyer.name",
+        "buyer.address"
+      ],
+      "note": "Signer depends on the statement being made; usually buyer (use tax, smog exemption). Employee should be able to add one manually with a reason.",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "reg_227_duplicate_title",
@@ -243,15 +491,31 @@
       "authority": "CA DMV",
       "appliesWhen": {
         "all": [
-          { "field": "arrangement.titleStatus", "op": "eq", "value": "missing" },
-          { "field": "arrangement.titleState", "op": "eq", "value": "CA" }
+          {
+            "field": "arrangement.titleStatus",
+            "op": "eq",
+            "value": "missing"
+          },
+          {
+            "field": "arrangement.titleState",
+            "op": "eq",
+            "value": "CA"
+          }
         ]
       },
-      "signers": ["CONSIGNOR"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": true,
-      "buyerCopy": false, "retain": true, "submitTo": "DMV",
+      "signers": [
+        "CONSIGNOR"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": true,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": "DMV",
       "timing": "INTAKE - blocks readiness until resolved. Registered owner (consignor or dealer) signs, not the buyer.",
-      "note": "If the missing title is from another state, the duplicate must come from that state; flag rather than generate."
+      "note": "If the missing title is from another state, the duplicate must come from that state; flag rather than generate.",
+      "journeyStage": "CONSIGN_INTAKE",
+      "sendableStandalone": false
     },
     {
       "key": "reg_135_bill_of_sale",
@@ -260,25 +524,58 @@
       "authority": "CA DMV",
       "appliesWhen": {
         "any": [
-          { "field": "title.hasPriceField", "op": "eq", "value": false },
-          { "field": "title.sellerNameMatches", "op": "eq", "value": false },
-          { "field": "manual.reg135Needed", "op": "eq", "value": true }
+          {
+            "field": "title.hasPriceField",
+            "op": "eq",
+            "value": false
+          },
+          {
+            "field": "title.sellerNameMatches",
+            "op": "eq",
+            "value": false
+          },
+          {
+            "field": "manual.reg135Needed",
+            "op": "eq",
+            "value": true
+          }
         ]
       },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": "DMV"
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": "DMV",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "reg_138_release_of_liability",
       "name": "REG 138 - Notice of Transfer and Release of Liability (consignor)",
       "category": 2,
       "authority": "Cal. Veh. Code 5900-5902",
-      "appliesWhen": { "field": "episode.dealType", "op": "eq", "value": "CONSIGNMENT" },
-      "signers": ["CONSIGNOR"],
-      "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": false, "retain": true, "submitTo": "DMV (online by consignor)",
-      "note": "Advisory, not blocking: the dealer's REG 51 submission is what transfers liability. Provide the consignor a prefilled copy or the online link."
+      "appliesWhen": {
+        "field": "episode.dealType",
+        "op": "eq",
+        "value": "CONSIGNMENT"
+      },
+      "signers": [
+        "CONSIGNOR"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": "DMV (online by consignor)",
+      "note": "Advisory, not blocking: the dealer's REG 51 submission is what transfers liability. Provide the consignor a prefilled copy or the online link.",
+      "journeyStage": "CONSIGN_SETTLEMENT",
+      "sendableStandalone": false
     },
     {
       "key": "reg_260_power_of_attorney",
@@ -287,14 +584,30 @@
       "authority": "CA DMV",
       "appliesWhen": {
         "any": [
-          { "field": "manual.consignorPOA", "op": "eq", "value": true },
-          { "field": "manual.buyerPOA", "op": "eq", "value": true }
+          {
+            "field": "manual.consignorPOA",
+            "op": "eq",
+            "value": true
+          },
+          {
+            "field": "manual.buyerPOA",
+            "op": "eq",
+            "value": true
+          }
         ]
       },
-      "signers": ["CONSIGNOR"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": true,
-      "buyerCopy": false, "retain": true, "submitTo": "DMV",
-      "note": "Cannot be used to sign the odometer disclosure on the signer's own behalf; REG 262 odometer section still needs the actual transferor."
+      "signers": [
+        "CONSIGNOR"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": true,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": "DMV",
+      "note": "Cannot be used to sign the odometer disclosure on the signer's own behalf; REG 262 odometer section still needs the actual transferor.",
+      "journeyStage": "CONSIGN_INTAKE",
+      "sendableStandalone": true
     },
     {
       "key": "reg_31_verification_of_vehicle",
@@ -303,50 +616,123 @@
       "authority": "CA DMV",
       "appliesWhen": {
         "all": [
-          { "field": "arrangement.titleState", "op": "neq", "value": "CA" },
-          { "field": "sale.registrationState", "op": "eq", "value": "CA" }
+          {
+            "field": "arrangement.titleState",
+            "op": "neq",
+            "value": "CA"
+          },
+          {
+            "field": "sale.registrationState",
+            "op": "eq",
+            "value": "CA"
+          }
         ]
       },
-      "signers": ["NONE"],
-      "eSign": false, "wetSignature": false, "physicalOriginal": true,
-      "buyerCopy": false, "retain": true, "submitTo": "DMV",
-      "note": "Completed by DMV, CHP, or licensed verifier. Dealers can be licensed vehicle verifiers; app only tracks."
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": true,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": "DMV",
+      "note": "Completed by DMV, CHP, or licensed verifier. Dealers can be licensed vehicle verifiers; app only tracks.",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "cdtfa_448_delivery_outside_ca",
       "name": "CDTFA-448 - Statement of Delivery Outside California",
       "category": 2,
       "authority": "CDTFA Reg. 1620",
-      "appliesWhen": { "field": "sale.deliveryState", "op": "neq", "value": "CA" },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": true,
-      "buyerCopy": true, "retain": true, "submitTo": "Retain for CDTFA audit",
-      "linkedCollect": ["transport_documents"],
+      "appliesWhen": {
+        "field": "sale.deliveryState",
+        "op": "neq",
+        "value": "CA"
+      },
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": true,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": "Retain for CDTFA audit",
+      "linkedCollect": [
+        "transport_documents"
+      ],
       "note": "Only supports the exemption if the dealer or a common carrier delivers out of state. Buyer pickup in CA = California tax due with the REG 51.",
-      "verify": true
+      "verify": true,
+      "journeyStage": "DELIVERY",
+      "sendableStandalone": false
     },
     {
       "key": "irs_8300",
       "name": "IRS Form 8300 - Cash Over $10,000",
       "category": 2,
       "authority": "26 U.S.C. 6050I",
-      "appliesWhen": { "field": "sale.paymentIncludesCashOver10k", "op": "eq", "value": true },
-      "signers": ["DEALER"],
-      "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": false, "retain": true, "submitTo": "IRS within 15 days (e-file)",
-      "note": "Cash includes cashier's checks/money orders under $10k in some cases. Annual customer statement also required."
+      "appliesWhen": {
+        "field": "sale.paymentIncludesCashOver10k",
+        "op": "eq",
+        "value": true
+      },
+      "signers": [
+        "DEALER"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": "IRS within 15 days (e-file)",
+      "note": "Cash includes cashier's checks/money orders under $10k in some cases. Annual customer statement also required.",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "reg_51_report_of_sale",
       "name": "REG 51 - Report of Sale, Used Vehicle",
       "category": 3,
       "authority": "Cal. Veh. Code 4456",
-      "appliesWhen": { "field": "sale.agreedPrice", "op": "exists" },
-      "signers": ["BUYER", "DEALER"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": true,
-      "buyerCopy": true, "retain": true, "submitTo": "DMV (with fees and sales tax) within statutory window",
-      "worksheet": ["reg51SerialNo", "vehicle.vin", "vehicle.year", "vehicle.make", "vehicle.model", "vehicle.bodyStyle", "plate", "odometer+status", "buyer.name+address", "coBuyer", "legalOwner (outside lender or none)", "sale.agreedPrice", "salesTaxCollected", "dealer.dealerLicenseNo", "dealer.sellersPermitNo", "sale.saleDate", "tempPlateNo"],
-      "note": "Track the serial number assigned. Buyer copy = temporary registration. Tax remitted to DMV at registration (all used dealers since 2026-01-01)."
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": true,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": "DMV (with fees and sales tax) within statutory window",
+      "worksheet": [
+        "reg51SerialNo",
+        "vehicle.vin",
+        "vehicle.year",
+        "vehicle.make",
+        "vehicle.model",
+        "vehicle.bodyStyle",
+        "plate",
+        "odometer+status",
+        "buyer.name+address",
+        "coBuyer",
+        "legalOwner (outside lender or none)",
+        "sale.agreedPrice",
+        "salesTaxCollected",
+        "dealer.dealerLicenseNo",
+        "dealer.sellersPermitNo",
+        "sale.saleDate",
+        "tempPlateNo"
+      ],
+      "note": "Track the serial number assigned. Buyer copy = temporary registration. Tax remitted to DMV at registration (all used dealers since 2026-01-01).",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "reg_262_reassignment",
@@ -355,28 +741,84 @@
       "authority": "CA DMV; 49 CFR 580 (odometer)",
       "appliesWhen": {
         "any": [
-          { "field": "arrangement.titleState", "op": "neq", "value": "CA" },
-          { "field": "title.reassignmentSpaceAvailable", "op": "eq", "value": false },
-          { "field": "odometer.disclosureRequired", "op": "eq", "value": true }
+          {
+            "field": "arrangement.titleState",
+            "op": "neq",
+            "value": "CA"
+          },
+          {
+            "field": "title.reassignmentSpaceAvailable",
+            "op": "eq",
+            "value": false
+          },
+          {
+            "field": "odometer.disclosureRequired",
+            "op": "eq",
+            "value": true
+          }
         ]
       },
-      "signers": ["CONSIGNOR", "DEALER", "BUYER"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": true,
-      "buyerCopy": false, "retain": true, "submitTo": "DMV",
-      "worksheet": ["vehicle.vin", "vehicle.year", "vehicle.make", "odometerReading", "vehicle.mileageStatus", "transferor names", "transferee names", "sale.agreedPrice", "sale.saleDate"],
-      "note": "Serialized security form. On consignment the consignor is transferor; dealer reassigns; buyer is transferee."
+      "signers": [
+        "CONSIGNOR",
+        "DEALER",
+        "BUYER"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": true,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": "DMV",
+      "worksheet": [
+        "vehicle.vin",
+        "vehicle.year",
+        "vehicle.make",
+        "odometerReading",
+        "vehicle.mileageStatus",
+        "transferor names",
+        "transferee names",
+        "sale.agreedPrice",
+        "sale.saleDate"
+      ],
+      "note": "Serialized security form. On consignment the consignor is transferor; dealer reassigns; buyer is transferee.",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "original_title",
       "name": "Original Certificate of Title",
       "category": 3,
       "authority": "CA DMV / issuing state",
-      "appliesWhen": { "field": "sale.agreedPrice", "op": "exists" },
-      "signers": ["CONSIGNOR", "DEALER", "BUYER", "LIENHOLDER"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": true,
-      "buyerCopy": false, "retain": false, "submitTo": "DMV (or handed to buyer for out-of-state registration)",
-      "tracked": ["present", "titleState", "registeredOwnerMatchesSeller", "lienholderOnTitle", "lienReleaseSigned", "sellerSignatures", "dealerReassignment", "buyerSignature", "readyForSubmission"],
-      "note": "Lienholder signature/release required if a legal owner appears on the title."
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "signers": [
+        "CONSIGNOR",
+        "DEALER",
+        "BUYER",
+        "LIENHOLDER"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": true,
+      "buyerCopy": false,
+      "retain": false,
+      "submitTo": "DMV (or handed to buyer for out-of-state registration)",
+      "tracked": [
+        "present",
+        "titleState",
+        "registeredOwnerMatchesSeller",
+        "lienholderOnTitle",
+        "lienReleaseSigned",
+        "sellerSignatures",
+        "dealerReassignment",
+        "buyerSignature",
+        "readyForSubmission"
+      ],
+      "note": "Lienholder signature/release required if a legal owner appears on the title.",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "odometer_disclosure",
@@ -385,38 +827,78 @@
       "authority": "49 CFR 580 (2021 amendment)",
       "appliesWhen": {
         "all": [
-          { "field": "vehicle.year", "op": "gte", "value": 2011 },
-          { "field": "vehicle.ageAtSaleModelYears", "op": "lt", "value": 20 }
+          {
+            "field": "vehicle.year",
+            "op": "gte",
+            "value": 2011
+          },
+          {
+            "field": "vehicle.ageAtSaleModelYears",
+            "op": "lt",
+            "value": 20
+          }
         ]
       },
-      "signers": ["CONSIGNOR", "DEALER", "BUYER"],
-      "eSign": false, "wetSignature": true, "physicalOriginal": true,
-      "buyerCopy": true, "retain": true, "submitTo": "DMV (on title or REG 262)",
+      "signers": [
+        "CONSIGNOR",
+        "DEALER",
+        "BUYER"
+      ],
+      "eSign": false,
+      "wetSignature": true,
+      "physicalOriginal": true,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": "DMV (on title or REG 262)",
       "note": "Model year 2010 and older: exempt. Even when exempt, the sale record must state EXEMPT and mileageStatus must not be UNKNOWN at contract time. mileageStatus is never inferred from year.",
-      "verify": true
+      "verify": true,
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "temp_registration_eros",
       "name": "Temporary Registration / Temporary Plate (eROS / TLP)",
       "category": 3,
       "authority": "CA DMV TLP program",
-      "appliesWhen": { "field": "sale.agreedPrice", "op": "exists" },
-      "signers": ["NONE"],
-      "eSign": false, "wetSignature": false, "physicalOriginal": true,
-      "buyerCopy": true, "retain": true, "submitTo": "DMV system",
-      "note": "Issued through the authorized DMV system, not generated. Track TLP number and expiry; out-of-state buyers driving home need it."
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": true,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": "DMV system",
+      "note": "Issued through the authorized DMV system, not generated. Track TLP number and expiry; out-of-state buyers driving home need it.",
+      "journeyStage": "DELIVERY",
+      "sendableStandalone": false
     },
     {
       "key": "nmvtis_report",
       "name": "NMVTIS Vehicle History Report",
       "category": 4,
       "authority": "Cal. Veh. Code 11713.26",
-      "appliesWhen": { "field": "sale.agreedPrice", "op": "exists" },
-      "signers": ["NONE"],
-      "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
       "timing": "INTAKE - run before listing; result sets vehicle.titleBrand.",
-      "note": "Pre-1981 vehicles without a 17-digit VIN often return nothing; record 'no NMVTIS record' with the lookup date."
+      "note": "Pre-1981 vehicles without a 17-digit VIN often return nothing; record 'no NMVTIS record' with the lookup date.",
+      "journeyStage": "CONSIGN_INTAKE",
+      "sendableStandalone": false
     },
     {
       "key": "smog_certificate",
@@ -425,73 +907,493 @@
       "authority": "Cal. Veh. Code 24007; H&S Code 44011",
       "appliesWhen": {
         "all": [
-          { "field": "sale.registrationState", "op": "eq", "value": "CA" },
-          { "field": "vehicle.year", "op": "gt", "value": 1975 },
-          { "field": "vehicle.fuelType", "op": "neq", "value": "ELECTRIC" },
-          { "field": "vehicle.isMotorcycle", "op": "neq", "value": true },
-          { "not": { "all": [ { "field": "vehicle.fuelType", "op": "eq", "value": "DIESEL" }, { "field": "vehicle.year", "op": "lte", "value": 1997 } ] } },
-          { "field": "vehicle.ageAtSaleModelYears", "op": "gte", "value": 4 }
+          {
+            "field": "sale.registrationState",
+            "op": "eq",
+            "value": "CA"
+          },
+          {
+            "field": "vehicle.year",
+            "op": "gt",
+            "value": 1975
+          },
+          {
+            "field": "vehicle.fuelType",
+            "op": "neq",
+            "value": "ELECTRIC"
+          },
+          {
+            "field": "vehicle.isMotorcycle",
+            "op": "neq",
+            "value": true
+          },
+          {
+            "not": {
+              "all": [
+                {
+                  "field": "vehicle.fuelType",
+                  "op": "eq",
+                  "value": "DIESEL"
+                },
+                {
+                  "field": "vehicle.year",
+                  "op": "lte",
+                  "value": 1997
+                }
+              ]
+            }
+          },
+          {
+            "field": "vehicle.ageAtSaleModelYears",
+            "op": "gte",
+            "value": 4
+          }
         ]
       },
-      "signers": ["NONE"],
-      "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": "DMV (electronic from station)",
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": "DMV (electronic from station)",
       "note": "Dealer's obligation on a CA retail sale. Vehicles under 4 model years old pay a smog transfer fee instead. When exempt, record which exemption applied. Valid 90 days.",
-      "verify": true
+      "verify": true,
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "lien_payoff_statement",
       "name": "Lien Payoff Statement (existing lender)",
       "category": 4,
-      "appliesWhen": { "field": "arrangement.lienStatus", "op": "in", "value": ["lien", "open", "active"] },
-      "signers": ["NONE"], "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": false, "retain": true, "submitTo": null
+      "appliesWhen": {
+        "field": "arrangement.lienStatus",
+        "op": "in",
+        "value": [
+          "lien",
+          "open",
+          "active"
+        ]
+      },
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": null,
+      "journeyStage": "CONSIGN_INTAKE",
+      "sendableStandalone": false
     },
     {
       "key": "lien_release",
       "name": "Lien Release / Proof Lien Paid",
       "category": 4,
-      "appliesWhen": { "field": "arrangement.lienStatus", "op": "in", "value": ["lien", "open", "active"] },
-      "signers": ["NONE"], "eSign": false, "wetSignature": false, "physicalOriginal": true,
-      "buyerCopy": false, "retain": true, "submitTo": "DMV with title",
-      "sequencing": "Blocks title readiness."
+      "appliesWhen": {
+        "field": "arrangement.lienStatus",
+        "op": "in",
+        "value": [
+          "lien",
+          "open",
+          "active"
+        ]
+      },
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": true,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": "DMV with title",
+      "sequencing": "Blocks title readiness.",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false
     },
     {
       "key": "outside_lender_package",
       "name": "Outside Lender: funding instructions, lienholder info, funding confirmation",
       "category": 4,
-      "appliesWhen": { "field": "sale.outsideLender", "op": "eq", "value": true },
-      "signers": ["NONE"], "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": false, "retain": true, "submitTo": null,
-      "captures": ["lenderPartyId", "lenderELTNo", "fundingConfirmedAt"],
-      "note": "Lender appears as legal owner on REG 51 and title application; feeds the REG 51 worksheet."
+      "appliesWhen": {
+        "field": "sale.outsideLender",
+        "op": "eq",
+        "value": true
+      },
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": null,
+      "captures": [
+        "lenderPartyId",
+        "lenderELTNo",
+        "fundingConfirmedAt"
+      ],
+      "note": "Lender appears as legal owner on REG 51 and title application; feeds the REG 51 worksheet.",
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
     },
     {
       "key": "transport_documents",
       "name": "Transport / Shipping Documents (bill of lading, delivery receipt)",
       "category": 4,
-      "appliesWhen": { "field": "sale.deliveryMethod", "op": "in", "value": ["COMMON_CARRIER", "DEALER_DELIVERS"] },
-      "signers": ["NONE"], "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": true, "retain": true, "submitTo": null,
-      "note": "Delivery receipt date starts the CARS Act cancellation clock and supports CDTFA-448. Links to existing TransportJob."
+      "appliesWhen": {
+        "field": "sale.deliveryMethod",
+        "op": "in",
+        "value": [
+          "COMMON_CARRIER",
+          "DEALER_DELIVERS"
+        ]
+      },
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": true,
+      "retain": true,
+      "submitTo": null,
+      "note": "Delivery receipt date starts the CARS Act cancellation clock and supports CDTFA-448. Links to existing TransportJob.",
+      "journeyStage": "DELIVERY",
+      "sendableStandalone": false
     },
     {
       "key": "consignor_proof_of_payment",
       "name": "Proof of Payment to Consignor",
       "category": 4,
-      "appliesWhen": { "field": "episode.dealType", "op": "eq", "value": "CONSIGNMENT" },
-      "signers": ["NONE"], "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": false, "retain": true, "submitTo": null,
-      "sequencing": "Deadline = fundsClearedAt + consignorPayoutDays (AppSetting). Show countdown on vehicle page."
+      "appliesWhen": {
+        "field": "episode.dealType",
+        "op": "eq",
+        "value": "CONSIGNMENT"
+      },
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": null,
+      "sequencing": "Deadline = fundsClearedAt + consignorPayoutDays (AppSetting). Show countdown on vehicle page.",
+      "journeyStage": "CONSIGN_SETTLEMENT",
+      "sendableStandalone": false
     },
     {
       "key": "buyer_id_copy",
       "name": "Copy of Buyer Government ID",
       "category": 4,
-      "appliesWhen": { "field": "sale.agreedPrice", "op": "exists" },
-      "signers": ["NONE"], "eSign": false, "wetSignature": false, "physicalOriginal": false,
-      "buyerCopy": false, "retain": true, "submitTo": null,
-      "note": "Store as signed_docs sensitivity; existing FileObject field grants apply."
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "signers": [
+        "NONE"
+      ],
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "buyerCopy": false,
+      "retain": true,
+      "submitTo": null,
+      "note": "Store as signed_docs sensitivity; existing FileObject field grants apply.",
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false
+    },
+    {
+      "category": 1,
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "intent_to_purchase",
+      "name": "Intent to Purchase",
+      "authority": "Dealer document",
+      "journeyStage": "LEAD",
+      "sendableStandalone": true,
+      "signers": [
+        "BUYER"
+      ],
+      "buyerCopy": true,
+      "appliesWhen": null,
+      "timing": "SALE",
+      "note": "Sent when a buyer wants to hold a car or make an offer. Not a contract — the purchase agreement follows. Pre-fills buyer, vehicle and offered price."
+    },
+    {
+      "category": 1,
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "wire_instructions",
+      "name": "Wire Instructions (GCCC)",
+      "authority": "Dealer document",
+      "journeyStage": "HOLD_DEPOSIT",
+      "sendableStandalone": true,
+      "signers": [
+        "NONE"
+      ],
+      "buyerCopy": true,
+      "appliesWhen": null,
+      "timing": "SALE",
+      "note": "Contains the dealership bank details. Only sent to a contact who has a deposit requested on a deal — never to a cold lead, never in bulk."
+    },
+    {
+      "category": 1,
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "payment_receipt",
+      "name": "Payment Receipt",
+      "authority": "Dealer document",
+      "journeyStage": "HOLD_DEPOSIT",
+      "sendableStandalone": false,
+      "signers": [
+        "DEALER"
+      ],
+      "buyerCopy": true,
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "timing": "SALE",
+      "note": "Receipt for a deposit or final payment, generated from the payment record."
+    },
+    {
+      "category": 1,
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "bill_of_sale_gccc",
+      "name": "Bill of Sale (GCCC)",
+      "authority": "Dealer document; destination-state requirement",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": false,
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "buyerCopy": true,
+      "appliesWhen": {
+        "field": "sale.registrationState",
+        "op": "neq",
+        "value": "CA"
+      },
+      "timing": "SALE",
+      "note": "The dealership's own bill of sale (distinct from DMV REG 135). Most out-of-state DMVs ask for one."
+    },
+    {
+      "category": 1,
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "lienholder_payoff_agreement",
+      "name": "Lienholder Payoff Purchase Agreement",
+      "authority": "Dealer document",
+      "journeyStage": "CONSIGN_INTAKE",
+      "sendableStandalone": true,
+      "signers": [
+        "CONSIGNOR",
+        "DEALER"
+      ],
+      "buyerCopy": false,
+      "appliesWhen": {
+        "all": [
+          {
+            "field": "episode.dealType",
+            "op": "eq",
+            "value": "CONSIGNMENT"
+          },
+          {
+            "field": "arrangement.lienStatus",
+            "op": "in",
+            "value": [
+              "lien",
+              "open",
+              "active"
+            ]
+          }
+        ]
+      },
+      "timing": "INTAKE - when a lien exists on the consigned vehicle",
+      "note": "Sets how the lien is paid from sale proceeds before the consignor is paid."
+    },
+    {
+      "category": 1,
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "title_custody_addendum",
+      "name": "Addendum – Title Custody and Release",
+      "authority": "Dealer document",
+      "journeyStage": "CONSIGN_INTAKE",
+      "sendableStandalone": true,
+      "signers": [
+        "CONSIGNOR",
+        "DEALER"
+      ],
+      "buyerCopy": false,
+      "appliesWhen": {
+        "field": "episode.dealType",
+        "op": "eq",
+        "value": "CONSIGNMENT"
+      },
+      "timing": "INTAKE - when the consignor hands the original title to the dealership",
+      "prefill": [
+        "vehicle.yearMakeModel",
+        "vehicle.vin",
+        "vehicle.stockNumber",
+        "consignor.name",
+        "agreement.date",
+        "addendum.date"
+      ],
+      "note": "Addendum to the consignment agreement: the dealership holds the original title for safekeeping and releases it only after sale, cleared funds and consignor payout."
+    },
+    {
+      "category": 1,
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "receipt_of_property",
+      "name": "Receipt of Property",
+      "authority": "Dealer document",
+      "journeyStage": "CONSIGN_INTAKE",
+      "sendableStandalone": true,
+      "signers": [
+        "CONSIGNOR",
+        "DEALER"
+      ],
+      "buyerCopy": false,
+      "appliesWhen": null,
+      "timing": "INTAKE - when the car and its items are received",
+      "note": "Records what came in with the car (keys, manuals, parts, title) at intake."
+    },
+    {
+      "category": 1,
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "consignment_certification_oos",
+      "name": "Consignment Sale Certification and Acknowledgment",
+      "authority": "Cal. Veh. Code 266, 11729, 11730",
+      "journeyStage": "CLOSING",
+      "sendableStandalone": true,
+      "signers": [
+        "CONSIGNOR",
+        "DEALER"
+      ],
+      "buyerCopy": true,
+      "appliesWhen": {
+        "all": [
+          {
+            "field": "episode.dealType",
+            "op": "eq",
+            "value": "CONSIGNMENT"
+          },
+          {
+            "field": "sale.registrationState",
+            "op": "neq",
+            "value": "CA"
+          }
+        ]
+      },
+      "timing": "SALE",
+      "prefill": [
+        "vehicle.year",
+        "vehicle.make",
+        "vehicle.model",
+        "vehicle.vin",
+        "vehicle.plate",
+        "vehicle.odometer",
+        "consignor.name",
+        "consignor.address1",
+        "consignor.cityStateZip",
+        "buyer.name",
+        "buyer.address1",
+        "buyer.cityStateZip",
+        "sale.date",
+        "sale.deliveryLocation"
+      ],
+      "note": "Explains to an out-of-state DMV, lender or transporter why the title shows the consignor transferring directly to the buyer with the dealership as selling agent."
+    },
+    {
+      "category": 1,
+      "eSign": false,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "vehicle_departure_checklist",
+      "name": "Vehicle Departure Checklist",
+      "authority": "Dealer document",
+      "journeyStage": "DELIVERY",
+      "sendableStandalone": false,
+      "signers": [
+        "DEALER"
+      ],
+      "buyerCopy": false,
+      "appliesWhen": {
+        "field": "sale.agreedPrice",
+        "op": "exists"
+      },
+      "timing": "POST_SALE - at delivery or return to consignor",
+      "note": "Internal checklist before a car leaves the lot. Printed, not sent to customers."
+    },
+    {
+      "category": 1,
+      "eSign": true,
+      "wetSignature": false,
+      "physicalOriginal": false,
+      "retain": true,
+      "submitTo": null,
+      "key": "as_is_sales_contract_ca",
+      "name": "CA As-Is Sales Contract (DRAFT – not approved)",
+      "authority": "Dealer document — DRAFT",
+      "journeyStage": "CONTRACT",
+      "sendableStandalone": false,
+      "signers": [
+        "BUYER",
+        "DEALER"
+      ],
+      "buyerCopy": true,
+      "appliesWhen": null,
+      "timing": "SALE",
+      "verify": true,
+      "active": false,
+      "note": "Draft from the dealership. Inactive until dealer counsel approves; cannot be produced or sent while inactive."
     }
-  ]
+  ],
+  "journeyStages": {
+    "LEAD": "Interested / holding a car",
+    "HOLD_DEPOSIT": "Deposit requested or received",
+    "CONTRACT": "Contract signing",
+    "CLOSING": "Closing and DMV",
+    "DELIVERY": "Delivery",
+    "CONSIGN_INTAKE": "Consignment intake",
+    "CONSIGN_SETTLEMENT": "Consignor settlement"
+  }
 }

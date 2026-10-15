@@ -2,6 +2,7 @@
  * Phase 6 sales services: deals, payments, release gate, delivery, cancel.
  * Sale status drives the episode's sales dimension (with history + audit).
  */
+import { adoptLibraryDocuments } from "@/modules/library/service";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import type { SessionUser } from "@/lib/authz/types";
@@ -81,6 +82,9 @@ export async function createSale(
     resourceId: sale.id,
     newValues: { episodeId: input.episodeId, agreedPrice: input.agreedPrice },
   });
+  // Anything already sent to this buyer from the Document Library for this
+  // car (an Intent to Purchase, say) now belongs to the deal.
+  await adoptLibraryDocuments(sale.id, input.episodeId, buyer);
   await evaluateSaleRequirements(user, sale.id);
   return sale;
 }

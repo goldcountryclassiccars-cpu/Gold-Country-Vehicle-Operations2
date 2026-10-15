@@ -93,12 +93,14 @@ PDFs like this and the app does the rest:
 
 | Field name | What happens |
 | --- | --- |
-| `SIG_BUYER`, `SIG_COBUYER`, `SIG_DEALER` | Becomes that signer's signature box. |
-| `DATE_BUYER`, `DATE_COBUYER`, `DATE_DEALER` | Date stamped when that person signs. |
+| `SIG_BUYER`, `SIG_COBUYER`, `SIG_CONSIGNOR`, `SIG_DEALER` | Becomes that signer's signature box. |
+| `DATE_BUYER`, `DATE_COBUYER`, `DATE_CONSIGNOR`, `DATE_DEALER` | Date stamped when that person signs. |
 | `INIT_BUYER`, `INIT_BUYER_2`, … | Initials box. A trailing `_2`, `_3` allows more than one. |
-| `buyer.name`, `buyer.street`, `buyer.city`, `buyer.state`, `buyer.zip`, `buyer.phone`, `buyer.email`, `buyer.printedName` (and `cobuyer.*`) | Pre-filled from the deal when the document is produced. |
-| `vehicle.year`, `vehicle.make`, `vehicle.model`, `vehicle.vin`, `vehicle.odometer`, `vehicle.stockNumber`, `vehicle.bodyStyle`, `vehicle.exteriorColor`, `vehicle.interiorColor`, `vehicle.engine` | Pre-filled. |
-| `sale.date`, `sale.agreementNo`, `sale.salesperson`, `price.cashPrice`, `price.salesTax` | Pre-filled. |
+| `buyer.name`, `buyer.street` (or `buyer.address1`), `buyer.city`, `buyer.state`, `buyer.zip`, `buyer.cityStateZip`, `buyer.phone`, `buyer.email`, `buyer.printedName` (and `cobuyer.*`, `consignor.*`) | Pre-filled from the deal — or, from the Document Library, from the contact chosen — when the document is produced. The consignor comes from the vehicle's arrangement. |
+| `vehicle.year`, `vehicle.make`, `vehicle.model`, `vehicle.yearMakeModel`, `vehicle.vin`, `vehicle.plate`, `vehicle.odometer`, `vehicle.stockNumber`, `vehicle.bodyStyle`, `vehicle.exteriorColor`, `vehicle.interiorColor`, `vehicle.engine` | Pre-filled. |
+| checkboxes `odometer.ACTUAL`, `odometer.NOT_ACTUAL`, `odometer.EXCEEDS`, `odometer.EXEMPT` | The one matching the vehicle's odometer status is ticked (TMU and broken odometer tick NOT_ACTUAL; UNKNOWN ticks nothing). |
+| `agreement.date`, `addendum.date`, `sale.deliveryLocation` | Consignment agreement start date; the addendum date and delivery location stay for staff. |
+| `sale.date`, `sale.agreementNo`, `sale.salesperson`, `price.cashPrice`, `price.salesTax` | Pre-filled on a deal; blank on a Library send (no deal yet). |
 | `cancel3.lastDay`, `cancel3.restockingFee`, `cancel3.buyers`, `cancel3.odometerAtSigning`, checkboxes named `…QUALIFIES…` / `…DOES_NOT_QUALIFY…` | Pre-filled for sales that carry the 3-day right. |
 | `dealer.printedName` | Filled with the countersigning Admin's name at send time. |
 
@@ -120,3 +122,25 @@ sandbox send before switching to the live key.
 - Sending is a deliberate multi-step flow (generate → review → confirm recipients →
   confirm package → send) and, in development, routes to the mock e-signature adapter
   which never contacts a real service.
+
+## The Document Library (Documents → Document Library)
+
+Every active document with a blank (categories 1 and 2) appears here, grouped by journey
+stage (interested → deposit → contract → closing → delivery; consignment intake →
+settlement). Documents marked *sendable standalone* in `prisma/document-registry.json`
+(Intent to Purchase, Wire Instructions, Consignment Agreement, Title Custody Addendum,
+Receipt of Property, Lienholder Payoff, Consignment Certification, REG 260) can be sent
+to a contact with no deal open, pre-filled from the vehicle and the contact, by
+e-signature or as an emailed PDF. Everything else is sent from the deal page so it carries
+the agreed price. Any role with `documents:send` (Admin and Front Desk) may send any of
+them; only the deal page's dealer countersign is Admin-restricted by the signer list.
+
+Hard rules, whoever sends: never a demonstration copy, never an inactive (draft)
+template, and Wire Instructions only to a contact with a deposit requested on a deal.
+A signed Library document is adopted by a deal opened later for the same car and
+buyer (matched on the contact or their email).
+
+Jade's app-ready PDFs for the two consignor forms built 2026-10-15 are
+`Upload to App - Addendum Title Custody and Release (Fillable).pdf` → **Addendum – Title
+Custody and Release** and `Upload to App - Consignment Sale Certification (Fillable).pdf`
+→ **Consignment Sale Certification and Acknowledgment**.

@@ -5,9 +5,9 @@
  * Signature boxes come from named form fields in the dealership's own PDFs —
  * the convention (see SALES_DOCUMENT_SETUP.md):
  *
- *   SIG_BUYER · SIG_COBUYER · SIG_DEALER     a signature line
- *   DATE_BUYER · DATE_COBUYER · DATE_DEALER  the date beside it (auto-filled at signing)
- *   INIT_BUYER · INIT_BUYER_2 · …            an initials box
+ *   SIG_BUYER · SIG_COBUYER · SIG_CONSIGNOR · SIG_DEALER     a signature line
+ *   DATE_BUYER · DATE_COBUYER · DATE_CONSIGNOR · DATE_DEALER  the date beside it (auto-filled at signing)
+ *   INIT_BUYER · INIT_BUYER_2 · …                             an initials box
  *
  * A trailing `_2`, `_3` allows more than one of a kind. A document with no
  * such fields (the demonstration stand-ins, or a PDF built without them) gets
@@ -38,7 +38,7 @@ export interface Packet {
   fields: Record<SignerRole, PlacedField[]>;
 }
 
-const FIELD_NAME = /^(SIG|DATE|INIT)_(BUYER|COBUYER|CO_BUYER|DEALER)(?:_\d+)?$/;
+const FIELD_NAME = /^(SIG|DATE|INIT)_(BUYER|COBUYER|CO_BUYER|CONSIGNOR|DEALER)(?:_\d+)?$/;
 
 const TYPE_OF: Record<string, FieldType> = { SIG: "Signature", DATE: "DateSigned", INIT: "Initial" };
 
@@ -47,7 +47,9 @@ const MIN_HEIGHT: Record<FieldType, number> = { Signature: 28, DateSigned: 18, I
 const MIN_WIDTH: Record<FieldType, number> = { Signature: 120, DateSigned: 70, Initial: 40 };
 
 function roleOf(token: string): SignerRole {
-  return token === "DEALER" ? "DEALER" : token === "BUYER" ? "BUYER" : "CO_BUYER";
+  if (token === "DEALER") return "DEALER";
+  if (token === "CONSIGNOR") return "CONSIGNOR";
+  return token === "BUYER" ? "BUYER" : "CO_BUYER";
 }
 
 /**
@@ -104,7 +106,7 @@ export function findSignatureFields(pdf: PDFDocument): { role: SignerRole; field
   return out;
 }
 
-const ROLE_LABEL: Record<SignerRole, string> = { BUYER: "Buyer", CO_BUYER: "Co-Buyer", DEALER: "Dealer" };
+const ROLE_LABEL: Record<SignerRole, string> = { BUYER: "Buyer", CO_BUYER: "Co-Buyer", CONSIGNOR: "Consignor", DEALER: "Dealer" };
 
 /** A plain page with a signature and date line per role, for documents that have none. */
 async function appendSignaturePage(pdf: PDFDocument, title: string, roles: SignerRole[]) {
@@ -137,7 +139,7 @@ async function appendSignaturePage(pdf: PDFDocument, title: string, roles: Signe
 export async function buildPacket(docs: PacketDocument[], roles: Set<SignerRole>): Promise<Packet> {
   if (docs.length === 0) throw new PacketError("There are no documents to send.");
   const merged = await PDFDocument.create();
-  const fields: Record<SignerRole, PlacedField[]> = { BUYER: [], CO_BUYER: [], DEALER: [] };
+  const fields: Record<SignerRole, PlacedField[]> = { BUYER: [], CO_BUYER: [], CONSIGNOR: [], DEALER: [] };
 
   for (const doc of docs) {
     if (doc.contentType !== "application/pdf") {

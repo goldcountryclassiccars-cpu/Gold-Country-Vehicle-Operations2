@@ -45,25 +45,44 @@ type PartyLike = {
   postalCode: string | null;
 };
 
-function partyValues(prefix: "buyer" | "cobuyer", p: PartyLike | null): PrefillValues {
+function partyValues(prefix: "buyer" | "cobuyer" | "consignor", p: PartyLike | null): PrefillValues {
   if (!p) return {};
+  const street = [p.addressLine1, p.addressLine2].filter(Boolean).join(", ");
+  const cityStateZip = [[p.city, p.state].filter(Boolean).join(", "), p.postalCode].filter(Boolean).join(" ");
   return {
     [`${prefix}.name`]: p.displayName,
     [`${prefix}.printedName`]: p.displayName,
-    [`${prefix}.street`]: [p.addressLine1, p.addressLine2].filter(Boolean).join(", "),
+    [`${prefix}.street`]: street,
+    [`${prefix}.address1`]: street,
     [`${prefix}.city`]: p.city ?? "",
     [`${prefix}.state`]: p.state ?? "",
     [`${prefix}.zip`]: p.postalCode ?? "",
+    [`${prefix}.cityStateZip`]: cityStateZip,
     [`${prefix}.phone`]: p.phone ?? "",
     [`${prefix}.email`]: p.email ?? "",
   };
 }
 
+/** Odometer checkbox names (odometer.ACTUAL …) the dealership's forms use, per Vehicle.mileageStatus. */
+export const ODOMETER_BOX: Record<string, "ACTUAL" | "NOT_ACTUAL" | "EXCEEDS" | "EXEMPT" | null> = {
+  ACTUAL: "ACTUAL",
+  NOT_ACTUAL: "NOT_ACTUAL",
+  TMU: "NOT_ACTUAL",
+  BROKEN_ODOMETER: "NOT_ACTUAL",
+  EXEMPT: "EXEMPT",
+  UNKNOWN: null,
+};
+
 export interface PrefillInput {
-  saleId: string;
+  /** Null for a standalone Library send — there is no deal yet. */
+  saleId: string | null;
   saleDay: string | null;
-  agreedPrice: number;
+  agreedPrice: number | null;
   salesTax: number | null;
+  /** Shown on consignor paperwork; from the episode's arrangement. */
+  agreementDay?: string | null;
+  deliveryLocation?: string | null;
+  plate?: string | null;
   odometer: number | null;
   stockNumber: string;
   salesperson: string | null;
@@ -79,15 +98,23 @@ export interface PrefillInput {
     engine: string | null;
     vin: string | null;
   };
-  buyer: PartyLike;
+  buyer: PartyLike | null;
   coBuyer: PartyLike | null;
+  consignor?: PartyLike | null;
 }
 
 /** Pure: the values for one deal. Empty strings are dropped. */
 export function prefillValues(i: PrefillInput): PrefillValues {
+  const yearMakeModel = [i.vehicle.year ? String(i.vehicle.year) : null, i.vehicle.make, i.vehicle.model, i.vehicle.trim]
+    .filter(Boolean)
+    .join(" ");
   const v: PrefillValues = {
-    "sale.agreementNo": i.saleId.slice(0, 8).toUpperCase(),
+    "sale.agreementNo": i.saleId ? i.saleId.slice(0, 8).toUpperCase() : "",
     "vehicle.stockNumber": i.stockNumber,
+    "vehicle.yearMakeModel": yearMakeModel,
+    "vehicle.plate": i.plate ?? "",
+    "sale.deliveryLocation": i.deliveryLocation ?? "",
+    "agreement.date": i.agreementDay ? usDate(i.agreementDay) : "",
     "sale.salesperson": i.salesperson ?? "",
     "vehicle.year": i.vehicle.year ? String(i.vehicle.year) : "",
     "vehicle.make": i.vehicle.make,
@@ -99,18 +126,20 @@ export function prefillValues(i: PrefillInput): PrefillValues {
     "vehicle.vin": i.vehicle.vin ?? "",
     "vehicle.odometer": i.odometer != null ? i.odometer.toLocaleString("en-US") : "",
     "cancel3.odometerAtSigning": i.odometer != null ? i.odometer.toLocaleString("en-US") : "",
-    "price.cashPrice": money(i.agreedPrice),
+    "price.cashPrice": i.agreedPrice != null ? money(i.agreedPrice) : "",
     "price.salesTax": i.salesTax != null ? money(i.salesTax) : "",
-    "cancel3.buyers": [i.buyer.displayName, i.coBuyer?.displayName].filter(Boolean).join(" and "),
+    "cancel3.buyers": [i.buyer?.displayName, i.coBuyer?.displayName].filter(Boolean).join(" and "),
     ...partyValues("buyer", i.buyer),
     ...partyValues("cobuyer", i.coBuyer),
+    ...partyValues("consignor", i.consignor ?? null),
   };
   if (i.saleDay) {
     v["sale.date"] = usDate(i.saleDay);
-    const qualifies = i.saleDay >= "2026-10-01" && i.agreedPrice <= 50000 && !i.isMotorcycle;
-    if (qualifies) {
+    const price = i.agreedPrice;
+    const qualifies = i.saleDay >= "2026-10-01" && price != null && price <= 50000 && !i.isMotorcycle;
+    if (qualifies && price != null) {
       v["cancel3.lastDay"] = `${usDate(addDays(i.saleDay, 3))} by close of business`;
-      v["cancel3.restockingFee"] = money(restockingFee(i.agreedPrice));
+      v["cancel3.restockingFee"] = money(restockingFee(price));
     }
   }
   return Object.fromEntries(Object.entries(v).filter(([, val]) => val !== ""));
@@ -121,7 +150,12 @@ export function prefillValues(i: PrefillInput): PrefillValues {
  * does not qualify" box for the 3-day right. Returns the input unchanged when
  * the PDF has no form (a scan, the demonstration stand-in).
  */
-export async function applyPrefill(bytes: Buffer, values: PrefillValues, qualifies3Day: boolean | null) {
+export async function applyPrefill(
+  bytes: Buffer,
+  values: PrefillValues,
+  qualifies3Day: boolean | null,
+  mileageStatus: string | null = null,
+) {
   let pdf: PDFDocument;
   try {
     pdf = await PDFDocument.load(bytes);
@@ -158,26 +192,99 @@ export async function applyPrefill(bytes: Buffer, values: PrefillValues, qualifi
       }
     }
   }
+  // Odometer status boxes (odometer.ACTUAL, odometer.EXEMPT, …): tick the one
+  // the vehicle record says. UNKNOWN ticks nothing — it is never inferred.
+  const box = mileageStatus ? (ODOMETER_BOX[mileageStatus] ?? null) : null;
+  if (box) {
+    for (const f of fields) {
+      const n = f.getName();
+      if (!n.startsWith("odometer.")) continue;
+      try {
+        const cb = form.getCheckBox(n);
+        if (n === `odometer.${box}`) cb.check();
+        else cb.uncheck();
+        touched++;
+      } catch {
+        /* not a checkbox */
+      }
+    }
+  }
   if (touched === 0) return bytes;
   return Buffer.from(await pdf.save());
 }
 
+/** The VIN (or primary identifier) on a vehicle record. */
+export function primaryVin(identifiers: { type: string; value: string; isPrimary: boolean }[]) {
+  const vin =
+    identifiers.find((x) => x.type === "VIN" && x.isPrimary) ??
+    identifiers.find((x) => x.type === "VIN") ??
+    identifiers.find((x) => x.isPrimary);
+  return vin?.value ?? null;
+}
+
+/**
+ * Values for a document sent from the Library with no deal: the car plus the
+ * contact it goes to (a buyer-side lead, or the consignor). Nothing priced,
+ * nothing dated to a sale — those fields stay blank for staff to fill.
+ */
+export async function prefillForEpisode(
+  episodeId: string,
+  party: { id: string; role: "BUYER" | "CONSIGNOR" } | null,
+): Promise<{ values: PrefillValues; mileageStatus: string }> {
+  const episode = await db.inventoryEpisode.findUniqueOrThrow({
+    where: { id: episodeId },
+    include: { vehicle: { include: { identifiers: true } }, arrangement: true },
+  });
+  const consignorId = episode.arrangement?.sellerPartyId ?? null;
+  const [partyRow, consignorRow] = await Promise.all([
+    party ? db.party.findUnique({ where: { id: party.id } }) : Promise.resolve(null),
+    consignorId ? db.party.findUnique({ where: { id: consignorId } }) : Promise.resolve(null),
+  ]);
+  const input: PrefillInput = {
+    saleId: null,
+    saleDay: null,
+    agreedPrice: null,
+    salesTax: null,
+    agreementDay: readDay(episode.arrangement?.agreementStartAt ?? null),
+    odometer: episode.vehicle.mileage ?? null,
+    stockNumber: episode.stockNumber,
+    salesperson: null,
+    isMotorcycle: episode.vehicle.isMotorcycle,
+    vehicle: {
+      year: episode.vehicle.year,
+      make: episode.vehicle.make,
+      model: episode.vehicle.model,
+      trim: episode.vehicle.trim,
+      bodyStyle: episode.vehicle.bodyStyle,
+      exteriorColor: episode.vehicle.exteriorColor,
+      interiorColor: episode.vehicle.interiorColor,
+      engine: [episode.vehicle.engineDescription, episode.vehicle.transmission].filter(Boolean).join(" / ") || null,
+      vin: primaryVin(episode.vehicle.identifiers),
+    },
+    buyer: party?.role === "BUYER" ? partyRow : null,
+    coBuyer: null,
+    consignor: party?.role === "CONSIGNOR" ? partyRow : consignorRow,
+  };
+  return { values: prefillValues(input), mileageStatus: episode.vehicle.mileageStatus };
+}
+
 /** Reads one deal's values from the database. */
-export async function prefillForSale(saleId: string): Promise<{ values: PrefillValues; qualifies3Day: boolean | null }> {
+export async function prefillForSale(
+  saleId: string,
+): Promise<{ values: PrefillValues; qualifies3Day: boolean | null; mileageStatus: string }> {
   const sale = await db.saleTransaction.findUniqueOrThrow({ where: { id: saleId } });
   const [episode, buyer, coBuyer, salesperson] = await Promise.all([
     db.inventoryEpisode.findUniqueOrThrow({
       where: { id: sale.episodeId },
-      include: { vehicle: { include: { identifiers: true } } },
+      include: { vehicle: { include: { identifiers: true } }, arrangement: true },
     }),
     db.party.findUniqueOrThrow({ where: { id: sale.buyerPartyId } }),
     sale.coBuyerPartyId ? db.party.findUnique({ where: { id: sale.coBuyerPartyId } }) : Promise.resolve(null),
     sale.salespersonId ? db.user.findUnique({ where: { id: sale.salespersonId }, select: { name: true } }) : Promise.resolve(null),
   ]);
-  const vin =
-    episode.vehicle.identifiers.find((x) => x.type === "VIN" && x.isPrimary) ??
-    episode.vehicle.identifiers.find((x) => x.type === "VIN") ??
-    episode.vehicle.identifiers.find((x) => x.isPrimary);
+  const consignor = episode.arrangement?.sellerPartyId
+    ? await db.party.findUnique({ where: { id: episode.arrangement.sellerPartyId } })
+    : null;
   const saleDay = readDay(sale.saleDate);
   const price = Number(sale.agreedPrice);
   const input: PrefillInput = {
@@ -185,6 +292,8 @@ export async function prefillForSale(saleId: string): Promise<{ values: PrefillV
     saleDay,
     agreedPrice: price,
     salesTax: sale.salesTaxCollected != null ? Number(sale.salesTaxCollected) : null,
+    agreementDay: readDay(episode.arrangement?.agreementStartAt ?? null),
+    deliveryLocation: sale.deliveryState ? (sale.deliveryState === "CA" ? "Grass Valley, CA" : sale.deliveryState) : null,
     odometer: sale.odometerAtSale ?? episode.vehicle.mileage ?? null,
     stockNumber: episode.stockNumber,
     salesperson: salesperson?.name ?? null,
@@ -198,13 +307,18 @@ export async function prefillForSale(saleId: string): Promise<{ values: PrefillV
       exteriorColor: episode.vehicle.exteriorColor,
       interiorColor: episode.vehicle.interiorColor,
       engine: [episode.vehicle.engineDescription, episode.vehicle.transmission].filter(Boolean).join(" / ") || null,
-      vin: vin?.value ?? null,
+      vin: primaryVin(episode.vehicle.identifiers),
     },
     buyer,
     coBuyer,
+    consignor,
   };
   const qualifies3Day = saleDay
     ? saleDay >= "2026-10-01" && price <= 50000 && !episode.vehicle.isMotorcycle
     : null;
-  return { values: prefillValues(input), qualifies3Day: saleDay && saleDay >= "2026-10-01" ? qualifies3Day : null };
+  return {
+    values: prefillValues(input),
+    qualifies3Day: saleDay && saleDay >= "2026-10-01" ? qualifies3Day : null,
+    mileageStatus: episode.vehicle.mileageStatus,
+  };
 }
