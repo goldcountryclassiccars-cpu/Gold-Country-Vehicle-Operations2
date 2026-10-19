@@ -74,6 +74,8 @@ describe("availability", () => {
     expect(channelCarries("classiccars", "sold")).toBe(false);
     expect(channelCarries("hemmings", "pending")).toBe(true);
     expect(channelCarries("website", "sold")).toBe(true);
+    expect(channelCarries("craigslist", "sold")).toBe(false);
+    expect(channelCarries("facebook_groups", "sold")).toBe(false);
   });
 });
 

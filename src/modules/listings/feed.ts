@@ -66,6 +66,8 @@ export interface FeedDealer {
   dealerLicense: string;
 }
 
+export const DEALER_PHONE = "(530) 955-0404";
+
 export const DEALER: Omit<FeedDealer, "phone"> = {
   name: "Gold Country Classic Cars",
   address: "422 Henderson Street",

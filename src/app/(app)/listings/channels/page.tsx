@@ -18,6 +18,18 @@ const SETUP: Record<string, string> = {
     "Ask our Hemmings rep to set up a dealer inventory feed from this link (CSV or XML — whichever their import team prefers). Until they confirm it is running, leave this on “By hand”: publish puts the car on your to-post list and the posting kit has the text and photos.",
   classiccars:
     "Ask ClassicCars.com dealer support to import our inventory from this link (CSV or XML). Until it is running, leave this on “By hand” and post from the posting kit.",
+  classic_com:
+    "classic.com takes dealer inventory as a data feed — send their dealer team this link (CSV or XML). Until they confirm, post by hand from the posting kit.",
+  autotrader_classics:
+    "Ask our AutotraderClassics.com rep whether they can import this feed link directly; otherwise it is posted by hand from the posting kit.",
+  craigslist:
+    "Posted by hand: Craigslist has no dealer feed. The posting kit downloads the first 24 photos (Craigslist's limit) and gives plain-text copy. Craigslist ads expire — re-post and mark live again when they do.",
+  facebook_marketplace:
+    "Posted by hand from the Dealer Page or a personal profile; the kit downloads the first 20 photos. (A dealer catalog feed exists through Meta's approved vehicle partners — ask us to look into it once volume justifies it.)",
+  facebook_page:
+    "A post on our Facebook Dealer Page. Use the short post from the posting kit; mark live once it's up so the app reminds you to post “SOLD” when it sells.",
+  facebook_groups:
+    "Posts in classic-car buy/sell groups. Use the short post and photos from the posting kit; paste the post link when marking live so it can be found again to mark sold.",
 };
 
 export default async function ListingChannelsPage() {

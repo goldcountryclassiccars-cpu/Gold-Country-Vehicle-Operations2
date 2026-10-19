@@ -39,13 +39,15 @@ export async function ListingSummary({ user, episodeId }: { user: SessionUser; e
         {videos + linkCount ? ` · ${videos + linkCount} video${videos + linkCount === 1 ? "" : "s"}` : ""}
       </p>
       <div className="mt-2 flex flex-wrap gap-1">
-        {pubs.map((p) => (
+        {pubs.filter((p) => p.status !== "OFF").map((p) => (
           <Badge key={p.channelKey} tone={p.needsTakedown ? "red" : p.status === "LIVE" ? "green" : p.status === "QUEUED" ? "blue" : "neutral"}>
             {p.channelName}: {p.needsTakedown ? "take down" : p.status === "LIVE" ? "live" : p.status === "QUEUED" ? "waiting" : p.status === "REMOVING" ? "coming down" : "not listed"}
           </Badge>
         ))}
       </div>
-      {live.length === 0 && listing ? <p className="mt-2 text-xs text-stone-500">Not published anywhere yet.</p> : null}
+      {live.length === 0 && listing && pubs.every((p) => p.status === "OFF") ? (
+        <p className="mt-2 text-xs text-stone-500">Not published anywhere yet.</p>
+      ) : null}
     </Card>
   );
 }

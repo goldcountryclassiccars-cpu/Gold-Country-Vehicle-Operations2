@@ -24,7 +24,7 @@ const envSchema = z.object({
   /** Signing secret shown on BoldSign's webhook settings page; verifies webhook calls. */
   BOLDSIGN_WEBHOOK_SECRET: z.string().optional(),
   LISTING_API_KEY: z.string().min(8).default("dev-listing-api-key"),
-  /** Dealership phone number printed in listing feeds (e.g. "(530) 555-0100"). Optional. */
+  /** Overrides the dealership phone printed in listing feeds (default (530) 955-0404). */
   DEALER_PHONE: z.string().min(7).optional(),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(12),
 });

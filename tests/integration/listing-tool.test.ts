@@ -287,6 +287,20 @@ describe("publishing and feeds", () => {
   });
 });
 
+describe("channels", () => {
+  it("offers all nine places; hand-posted social channels are opt-in; the feed carries our phone", async () => {
+    const channels = await ensureChannels();
+    expect(channels.map((c) => c.key)).toEqual([
+      "website", "hemmings", "classiccars", "classic_com", "autotrader_classics",
+      "craigslist", "facebook_marketplace", "facebook_page", "facebook_groups",
+    ]);
+    const { channelDefaults, dealerInfo } = await import("@/modules/listings/service");
+    expect(channelDefaults("craigslist")!.photoLimit).toBe(24);
+    expect(channelDefaults("facebook_marketplace")!.tickedByDefault).toBe(false);
+    expect(dealerInfo().phone).toBe("(530) 955-0404");
+  });
+});
+
 describe("permissions", () => {
   it("shop adds listing photos but cannot write, arrange or publish; front desk can do it all", () => {
     const u = { id: "x", name: "x", email: "x" };

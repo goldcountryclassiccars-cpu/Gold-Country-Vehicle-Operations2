@@ -23,6 +23,7 @@ import type { SessionUser } from "@/lib/authz/types";
 import { bumpListingVersion, LISTING_PHOTO_LIMIT } from "@/modules/media/service";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import {
+  DEALER_PHONE,
   availabilityFor,
   composeDescription,
   DEALER,
@@ -40,11 +41,27 @@ export class ListingError extends Error {}
 // Channels
 // ---------------------------------------------------------------------------
 
+/**
+ * Every place a car can be listed. `photoLimit` is how many photos the place
+ * takes (the posting kit downloads that many, cover first); `tickedByDefault`
+ * is whether the Publish box pre-ticks it — the hand-posted social channels are
+ * opt-in per car so publishing never quietly creates six to-dos.
+ */
 export const CHANNEL_DEFAULTS = [
-  { key: "website", name: "Our website", sortOrder: 1 },
-  { key: "hemmings", name: "Hemmings", sortOrder: 2 },
-  { key: "classiccars", name: "ClassicCars.com", sortOrder: 3 },
+  { key: "website", name: "Our website", sortOrder: 1, photoLimit: null, tickedByDefault: true, kind: "site" },
+  { key: "hemmings", name: "Hemmings", sortOrder: 2, photoLimit: null, tickedByDefault: true, kind: "marketplace" },
+  { key: "classiccars", name: "ClassicCars.com", sortOrder: 3, photoLimit: null, tickedByDefault: true, kind: "marketplace" },
+  { key: "classic_com", name: "classic.com", sortOrder: 4, photoLimit: null, tickedByDefault: false, kind: "marketplace" },
+  { key: "autotrader_classics", name: "AutotraderClassics.com", sortOrder: 5, photoLimit: null, tickedByDefault: false, kind: "marketplace" },
+  { key: "craigslist", name: "Craigslist", sortOrder: 6, photoLimit: 24, tickedByDefault: false, kind: "classified" },
+  { key: "facebook_marketplace", name: "Facebook Marketplace", sortOrder: 7, photoLimit: 20, tickedByDefault: false, kind: "social" },
+  { key: "facebook_page", name: "Facebook Dealer Page", sortOrder: 8, photoLimit: null, tickedByDefault: false, kind: "social" },
+  { key: "facebook_groups", name: "Facebook Groups", sortOrder: 9, photoLimit: null, tickedByDefault: false, kind: "social" },
 ] as const;
+
+export function channelDefaults(key: string) {
+  return CHANNEL_DEFAULTS.find((c) => c.key === key);
+}
 export type ChannelKey = (typeof CHANNEL_DEFAULTS)[number]["key"];
 export const CHANNEL_KEYS: string[] = CHANNEL_DEFAULTS.map((c) => c.key);
 
@@ -533,7 +550,7 @@ async function markEpisodeLive(episodeId: string, changedBy: string | null) {
 // ---------------------------------------------------------------------------
 
 export function dealerInfo(): FeedDealer {
-  return { ...DEALER, phone: config().DEALER_PHONE ?? null };
+  return { ...DEALER, phone: config().DEALER_PHONE ?? DEALER_PHONE };
 }
 
 export function publicMediaUrl(assetId: string, size: "large" | "thumb" = "large") {
@@ -731,6 +748,8 @@ export type PublicationView = {
   externalUrl: string | null;
   liveAt: Date | null;
   lastDeliveredAt: Date | null;
+  /** Pre-ticked in the Publish box. */
+  tickedByDefault: boolean;
 };
 
 export function publicationViews(
@@ -752,6 +771,7 @@ export function publicationViews(
       externalUrl: pub?.externalUrl ?? null,
       liveAt: pub?.liveAt ?? null,
       lastDeliveredAt: pub?.lastDeliveredAt ?? null,
+      tickedByDefault: channelDefaults(c.key)?.tickedByDefault ?? false,
     };
   });
 }

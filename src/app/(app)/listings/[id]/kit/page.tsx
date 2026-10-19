@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/authz/engine";
 import { db } from "@/lib/db";
-import { listingMedia, toFeedListing, CHANNEL_DEFAULTS } from "@/modules/listings/service";
+import { channelDefaults, dealerInfo, listingMedia, toFeedListing } from "@/modules/listings/service";
 import { Card, PageHeader } from "@/components/ui";
 import { CopyBlock, DownloadPhotos } from "./kit-tools";
 
@@ -71,7 +71,24 @@ export default async function ListingKitPage({
   ];
   const specsText = specs.filter(([, v]) => v != null && v !== "").map(([k, v]) => `${k}: ${v}`).join("\n");
   const youtube = feed.videos.find((v) => v.kind === "youtube")?.url ?? null;
-  const channelName = CHANNEL_DEFAULTS.find((c) => c.key === channel)?.name;
+  const ch = channel ? channelDefaults(channel) : undefined;
+  const channelName = ch?.name;
+  const photoLimit = ch?.photoLimit ?? null;
+  const kitPhotos = photoLimit ? photos.slice(0, photoLimit) : photos;
+  const social = ch?.kind === "social" || ch?.kind === "classified";
+  const dealer = dealerInfo();
+  // A short post for Facebook / Craigslist: what it is, the price, the best
+  // points, and how to reach a person — the full write-up is too long there.
+  const shortPost = [
+    `${feed.title} — ${feed.priceLabel}`,
+    feed.headline,
+    feed.highlights.length ? feed.highlights.map((h) => `✔ ${h}`).join("\n") : null,
+    feed.mileage != null ? `${feed.mileage.toLocaleString()} miles${feed.mileageNote ? ` (${feed.mileageNote})` : ""}` : null,
+    `Call or text ${dealer.phone} · ${dealer.name}, ${dealer.address}, ${dealer.city}, ${dealer.state}`,
+    `More photos and details: ${dealer.website}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const fileBase = `${feed.stockNumber}-${[feed.year, feed.make, feed.model].filter(Boolean).join("-")}`.replace(/[^\w-]+/g, "-");
 
   return (
@@ -138,8 +155,14 @@ export default async function ListingKitPage({
           <Card accent="teal">
             <h2 className="mb-3 text-base font-semibold text-stone-900">Posting kit</h2>
             <div className="space-y-4">
-              <DownloadPhotos photos={photos.map((p) => ({ url: p.url }))} fileBase={fileBase} />
-              <p className="text-xs text-stone-500">Numbered in listing order, the cover first — upload them in that order.</p>
+              <DownloadPhotos photos={kitPhotos.map((p) => ({ url: p.url }))} fileBase={fileBase} />
+              <p className="text-xs text-stone-500">
+                Numbered in listing order, the cover first — upload them in that order.
+                {photoLimit && photos.length > photoLimit
+                  ? ` ${channelName} takes up to ${photoLimit} photos, so this downloads the first ${photoLimit}.`
+                  : ""}
+              </p>
+              {social || !channelName ? <CopyBlock label="Short post (Facebook, Craigslist)" text={shortPost} rows={9} /> : null}
               <CopyBlock label="Title" text={feed.title} rows={2} />
               <CopyBlock label="Price" text={feed.price != null ? String(feed.price) : feed.priceLabel} rows={1} />
               <CopyBlock label="Description" text={feed.descriptionText} rows={12} />

@@ -138,7 +138,10 @@ export default async function ListingsPage({ searchParams }: { searchParams: Pro
                     {availability !== "available" ? ` · ${availability === "sold" ? "sold" : "sale pending"}` : ""}
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
-                    {pubs.map((p) => (
+                    {pubs.filter((p) => p.status !== "OFF").length === 0 ? (
+                      <Badge tone="neutral">Not published</Badge>
+                    ) : null}
+                    {pubs.filter((p) => p.status !== "OFF").map((p) => (
                       <Badge
                         key={p.channelKey}
                         tone={p.needsTakedown ? "red" : p.status === "LIVE" ? (p.behind ? "amber" : "green") : p.status === "QUEUED" ? "blue" : "neutral"}

@@ -21,6 +21,7 @@ interface Pub {
   externalUrl: string | null;
   liveAt: string | null;
   lastDeliveredAt: string | null;
+  tickedByDefault: boolean;
 }
 
 function statusBadge(p: Pub) {
@@ -166,7 +167,7 @@ export function PublishPanel({
                 type="checkbox"
                 name="channel"
                 value={p.channelKey}
-                defaultChecked={availability !== "sold" || p.channelKey === "website"}
+                defaultChecked={availability === "sold" ? p.channelKey === "website" : p.tickedByDefault}
               />
               {p.channelName}
             </label>
