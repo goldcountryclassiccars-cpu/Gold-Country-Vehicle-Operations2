@@ -128,6 +128,8 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       work_orders: { view: "ALL" },
       expenses: { view: "ALL", create: "ALL", edit: "ALL" },
       media: { view: "ALL", create: "ALL", edit: "ALL" },
+      // The Listing Tool: write the car up, curate its photos, publish it.
+      listings: { view: "ALL", create: "ALL", edit: "ALL", generate: "ALL" },
       sales: { view: "ALL", create: "ALL", edit: "ALL" },
       payments: { view: "ALL", create: "ALL", edit: "ALL" },
       documents: { view: "ALL", create: "ALL", edit: "ALL", generate: "ALL", send: "ALL" },
@@ -158,6 +160,9 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       inspections: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL" },
       work_orders: { view: "ALL", create: "ALL", edit: "ALL", complete: "ALL" },
       media: { view: "ALL", create: "ALL" },
+      // The shop shoots the cars: it can add listing photos and see the
+      // listing, but writing, arranging and publishing stay with the office.
+      listings: { view: "ALL", create: "ALL" },
       calendar: { view: "ALL" },
       parts: { view: "ALL", create: "ALL", edit: "ALL" },
       notifications: { view: "OWN" },

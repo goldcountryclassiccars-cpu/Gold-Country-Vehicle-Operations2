@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/auth/current-user";
 import { canViewField, hasPermission } from "@/lib/authz/engine";
 import type { SensitiveField } from "@/lib/authz/registry";
 import { db } from "@/lib/db";
-import { storage } from "@/lib/adapters/storage";
+import { RELAY_MAX_BYTES, storage } from "@/lib/adapters/storage";
 
 /**
  * Authorized file download. Files are private by default; sensitive files
@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // A photo's resized copies (webFileId/thumbFileId) are media the same as its
   // original.
   const asset = await db.mediaAsset.findFirst({
-    where: { OR: [{ fileId: id }, { webFileId: id }, { thumbFileId: id }] },
+    where: { OR: [{ fileId: id }, { webFileId: id }, { thumbFileId: id }, { largeFileId: id }] },
   });
   if (asset) {
     if (!hasPermission(user, "media", "view")) {
@@ -33,6 +33,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
   if (file.sensitivity && !canViewField(user, file.sensitivity as SensitiveField)) {
     return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  }
+
+  // Videos and full-size originals are too big to relay through a serverless
+  // function; hand the browser a short-lived link straight to storage instead.
+  if (file.sizeBytes > RELAY_MAX_BYTES) {
+    const direct = await storage().presignGet(file.storageKey, {
+      contentType: file.contentType,
+      fileName: file.originalName,
+      expiresIn: 60 * 60,
+    });
+    if (direct) return NextResponse.redirect(direct, 302);
   }
 
   try {

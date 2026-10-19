@@ -27,6 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/parts", label: "Parts & Supplies", icon: "Package", requires: { resource: "parts", action: "view" } },
   { href: "/expenses", label: "Expenses", icon: "Receipt", requires: { resource: "expenses", action: "view" } },
   { href: "/profitability", label: "Profitability", icon: "TrendingUp", requires: { resource: "profitability", action: "view" } },
+  { href: "/listings", label: "Listings", icon: "Megaphone", requires: { resource: "listings", action: "view" } },
   { href: "/media", label: "Media", icon: "Camera", requires: { resource: "media", action: "view" } },
   { href: "/sales", label: "Deals in Progress", icon: "Handshake", requires: { resource: "sales", action: "view" } },
   { href: "/documents", label: "Documents", icon: "FileText", requires: { resource: "documents", action: "view" } },
@@ -36,8 +37,9 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /**
- * Removed from the sidebar deliberately, 2026-09: Approvals, Listings, Closing
- * Desk, Transport, Consignments, Settlements, Integrations.
+ * Removed from the sidebar deliberately, 2026-09: Approvals, Closing
+ * Desk, Transport, Consignments, Settlements, Integrations. (Listings came back
+ * 2026-10-19 as the Listing Tool.)
  *
  * The routes still exist and still enforce permissions — they are unlinked, not
  * deleted, because several carry logic the business still depends on:
@@ -55,7 +57,6 @@ export const NAV_ITEMS: NavItem[] = [
  */
 export const UNLINKED_ROUTES = [
   "/approvals",
-  "/listings",
   "/closing",
   "/transport",
   "/consignments",

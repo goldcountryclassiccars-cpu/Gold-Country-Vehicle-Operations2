@@ -9,6 +9,7 @@ import { sanitizeArrangementForUser } from "@/modules/vehicles/sanitize";
 import { BOARD_BLURB, BOARD_TONE, boardStage, hasOpenDeal } from "@/modules/episodes/board";
 import { DeleteVehicleControl } from "@/components/delete-vehicle";
 import { PhotoSection } from "@/components/photo-section";
+import { ListingSummary } from "@/components/listing-summary";
 import { StageLockedNote, StageMove } from "@/components/stage-move";
 import { STATUS_DIMENSIONS, type StatusDimension } from "@/modules/episodes/service";
 import {
@@ -255,6 +256,9 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
 
       <div className="mb-6">
         <PhotoSection user={user} episodeId={episode.id} />
+      </div>
+      <div className="mb-6">
+        <ListingSummary user={user} episodeId={episode.id} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

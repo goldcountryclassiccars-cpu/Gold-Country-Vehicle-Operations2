@@ -1,7 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 // /api/esign/boldsign authenticates by HMAC signature, not a session cookie.
-const PUBLIC_PATHS = ["/login", "/api/integration", "/api/health", "/api/esign/boldsign"];
+// Listing feeds authenticate by the channel's feed token; listing media is
+// public by design (only photos of published listings, by unguessable id).
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/integration",
+  "/api/health",
+  "/api/esign/boldsign",
+  "/api/listings/feed/",
+  "/api/listings/media/",
+];
 
 /**
  * Lightweight gate: redirects requests without a session cookie to /login.

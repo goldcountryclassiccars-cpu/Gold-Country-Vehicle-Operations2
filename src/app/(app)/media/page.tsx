@@ -27,7 +27,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
   const selected = selectedId ? episodes.find((e) => e.id === selectedId) : null;
   const [selectedAssets, checklist] = selected
     ? await Promise.all([
-        db.mediaAsset.findMany({ where: { episodeId: selected.id, archivedAt: null }, orderBy: { sortOrder: "asc" } }),
+        db.mediaAsset.findMany({ where: { episodeId: selected.id, purpose: "INTAKE", archivedAt: null }, orderBy: { sortOrder: "asc" } }),
         db.mediaChecklistItem.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
       ])
     : [[], []];
@@ -37,7 +37,10 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="mx-auto max-w-6xl">
-      <PageHeader title="Media" subtitle="Photo and video coverage per vehicle, tracked against the listing checklist." />
+      <PageHeader
+        title="Media"
+        subtitle="Intake photo coverage per vehicle, tracked against the intake checklist. Listing photos and videos live in Listings."
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-2">

@@ -909,8 +909,17 @@ enum MediaKind {
   DOCUMENT
 }
 
+// Intake media is the dealership's condition record from when a car arrives —
+// kept for our files, never published. Listing media is the curated set the
+// Listing Tool sends to the website and the marketplaces. Same storage, same
+// pipeline, different job; every existing asset is intake.
+enum MediaPurpose {
+  INTAKE
+  LISTING
+}
+
 model MediaAsset {
-  id           String    @id @default(uuid())
+  id           String       @id @default(uuid())
   episodeId    String
   fileId       String // FileObject id (the original)
   // Resized copies made at upload time so galleries load small files. Nullable:
@@ -918,29 +927,121 @@ model MediaAsset {
   // falls back to serving the original.
   webFileId    String?
   thumbFileId  String?
-  kind         MediaKind @default(PHOTO)
+  // Listing photos also get a large JPEG (2400px) made at upload — the copy the
+  // platforms receive, since none of them accept iPhone HEIC originals.
+  largeFileId  String?
+  kind         MediaKind    @default(PHOTO)
+  purpose      MediaPurpose @default(INTAKE)
   // Category keys match MediaChecklistItem.key so readiness is computable.
-  category     String    @default("other")
+  category     String       @default("other")
   caption      String?
-  sortOrder    Int       @default(0)
+  sortOrder    Int          @default(0)
   uploadedById String
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime     @default(now())
   archivedAt   DateTime?
 
   @@index([episodeId, category])
+  @@index([episodeId, purpose, kind])
 }
 
 // A video about the vehicle that lives elsewhere (Google Photos, YouTube).
 // Storing links instead of video files keeps storage costs at photo scale.
 model VideoLink {
-  id          String   @id @default(uuid())
+  id          String       @id @default(uuid())
   episodeId   String
   url         String
   label       String?
+  purpose     MediaPurpose @default(INTAKE)
+  sortOrder   Int          @default(0)
   createdById String
-  createdAt   DateTime @default(now())
+  createdAt   DateTime     @default(now())
 
   @@index([episodeId])
+}
+
+// ---------------------------------------------------------------------------
+// Listing Tool — the write-up for one car's time in inventory, and where it
+// has been published. Specs, VIN and price stay on Vehicle / InventoryEpisode
+// (one source of truth); the listing holds the words buyers read.
+// ---------------------------------------------------------------------------
+
+enum ListingPriceDisplay {
+  SHOW
+  CALL_FOR_PRICE
+}
+
+model Listing {
+  id             String              @id @default(uuid())
+  episodeId      String              @unique
+  title          String
+  headline       String?
+  highlights     String[]            @default([])
+  description    String?             @db.Text
+  equipment      String?             @db.Text
+  history        String?             @db.Text
+  condition      String?             @db.Text
+  documentation  String?             @db.Text
+  priceDisplay   ListingPriceDisplay @default(SHOW)
+  // Bumped on every change a buyer could see (words, photos, videos, price),
+  // so each channel can tell whether it has the latest version.
+  contentVersion Int                 @default(1)
+  createdById    String
+  updatedById    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  publications ListingPublication[]
+}
+
+enum ListingChannelMethod {
+  // The platform (or our website) pulls a feed URL on its own schedule.
+  FEED
+  // No feed set up yet: staff post by hand from the posting kit, then mark live.
+  MANUAL
+}
+
+model ListingChannel {
+  key           String               @id // "website" | "hemmings" | "classiccars"
+  name          String
+  method        ListingChannelMethod @default(MANUAL)
+  enabled       Boolean              @default(true)
+  sortOrder     Int                  @default(0)
+  // Secret in the feed URL. The feed only carries public listing fields, but
+  // the URL is still not something to publish.
+  feedToken     String               @unique
+  lastFetchAt   DateTime?
+  lastFetchFrom String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+enum PublicationStatus {
+  QUEUED // in the feed, waiting for the platform to pick it up (or to be posted by hand)
+  LIVE // the platform has it (feed fetched, or staff confirmed)
+  REMOVING // taken out of the feed, waiting for the platform to notice
+  OFF // not on this channel
+}
+
+model ListingPublication {
+  id               String            @id @default(uuid())
+  listing          Listing           @relation(fields: [listingId], references: [id])
+  listingId        String
+  channelKey       String
+  status           PublicationStatus @default(QUEUED)
+  // contentVersion the channel last received; behind listing.contentVersion
+  // means changes are waiting to go out.
+  deliveredVersion Int?
+  externalUrl      String?
+  queuedAt         DateTime?
+  liveAt           DateTime?
+  lastDeliveredAt  DateTime?
+  removedAt        DateTime?
+  updatedById      String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([listingId, channelKey])
+  @@index([channelKey, status])
 }
 
 // Configurable media checklist (Administration-editable).
@@ -1133,30 +1234,30 @@ model DocumentTemplate {
 
   // --- Compliance metadata (registry-seeded)
   /// 1 dealer-authored · 2 government fillable PDF · 3 controlled original · 4 third-party
-  category          Int            @default(1)
-  authority         String? // statute or agency this document answers to
+  category           Int            @default(1)
+  authority          String? // statute or agency this document answers to
   /// Rule tree evaluated by modules/documents/rules.ts. Null = never automatically required.
-  appliesWhen       Json?
-  signers           String[]       @default([]) // BUYER | CO_BUYER | DEALER | CONSIGNOR | LIENHOLDER | NONE
-  eSign             Boolean        @default(false)
-  physicalOriginal  Boolean        @default(false)
-  buyerCopy         Boolean        @default(false)
-  retain            Boolean        @default(true)
-  submitTo          String?
-  timing            DocumentTiming @default(SALE)
+  appliesWhen        Json?
+  signers            String[]       @default([]) // BUYER | CO_BUYER | DEALER | CONSIGNOR | LIENHOLDER | NONE
+  eSign              Boolean        @default(false)
+  physicalOriginal   Boolean        @default(false)
+  buyerCopy          Boolean        @default(false)
+  retain             Boolean        @default(true)
+  submitTo           String?
+  timing             DocumentTiming @default(SALE)
   /// Effective window, compared against the sale date. This is how the Contract
   /// Cancellation Option and the 3-Day Right to Cancel swap on 2026-10-01.
-  effectiveFrom     DateTime?
-  effectiveTo       DateTime?
-  worksheetFields   String[]       @default([])
-  notes             String?
+  effectiveFrom      DateTime?
+  effectiveTo        DateTime?
+  worksheetFields    String[]       @default([])
+  notes              String?
   /// True until dealer counsel has confirmed the rule and thresholds.
-  verifyWithCounsel Boolean        @default(false)
+  verifyWithCounsel  Boolean        @default(false)
   /// Where in the buyer's or consignor's journey this document belongs (library grouping).
-  journeyStage      JourneyStage   @default(CONTRACT)
+  journeyStage       JourneyStage   @default(CONTRACT)
   /// May be sent from the Document Library to a contact with no sale open —
   /// an Intent to Purchase to a lead, a title addendum to a consignor.
-  sendableStandalone Boolean       @default(false)
+  sendableStandalone Boolean        @default(false)
 
   // --- The dealership's own approved document, uploaded through Administration.
   //

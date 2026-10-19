@@ -19,7 +19,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const [media, readiness, assets] = await Promise.all([
     mediaReadiness(id),
     listingReadiness(id),
-    db.mediaAsset.findMany({ where: { episodeId: id, archivedAt: null }, orderBy: { sortOrder: "asc" } }),
+    // Listing media only — intake photos are the dealership's condition record, not marketing.
+    db.mediaAsset.findMany({ where: { episodeId: id, purpose: "LISTING", archivedAt: null }, orderBy: { sortOrder: "asc" } }),
   ]);
   const v = episode.vehicle;
   return NextResponse.json({

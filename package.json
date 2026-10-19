@@ -34,6 +34,7 @@
     "class-variance-authority": "^0.7",
     "clsx": "^2",
     "date-fns": "^4",
+    "fflate": "^0.8.3",
     "lucide-react": "^0.475.0",
     "next": "^15",
     "pdf-lib": "^1.17.1",

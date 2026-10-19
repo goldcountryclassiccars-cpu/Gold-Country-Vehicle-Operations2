@@ -30,6 +30,12 @@ export interface StorageAdapter {
    * (local dev) — the caller then uses the app's own upload route.
    */
   presignPut(key: string, contentType: string): Promise<string | null>;
+  /**
+   * A short-lived URL the browser can GET the object from directly, or null
+   * (local dev). Used for files too big for the app server to relay — videos,
+   * full-size originals — and for platforms fetching listing photos.
+   */
+  presignGet(key: string, opts?: { contentType?: string; fileName?: string; expiresIn?: number }): Promise<string | null>;
 }
 
 class LocalStorageAdapter implements StorageAdapter {
@@ -64,6 +70,9 @@ class LocalStorageAdapter implements StorageAdapter {
   }
   async presignPut() {
     return null; // local dev has no direct URL — uploads go through the app route
+  }
+  async presignGet() {
+    return null; // local dev streams through the app
   }
 }
 
@@ -132,7 +141,28 @@ class S3StorageAdapter implements StorageAdapter {
       { expiresIn: 15 * 60 },
     );
   }
+
+  async presignGet(key: string, opts?: { contentType?: string; fileName?: string; expiresIn?: number }) {
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ResponseContentType: opts?.contentType,
+        ResponseContentDisposition: opts?.fileName
+          ? `inline; filename="${opts.fileName.replace(/[^\w.\- ]/g, "_")}"`
+          : undefined,
+      }),
+      { expiresIn: opts?.expiresIn ?? 60 * 60 },
+    );
+  }
 }
+
+/**
+ * Past this size a download goes straight from storage (presigned redirect)
+ * rather than through the app — Vercel caps a function response at ~4.5MB.
+ */
+export const RELAY_MAX_BYTES = 4 * 1024 * 1024;
 
 let adapter: StorageAdapter | null = null;
 export function storage(): StorageAdapter {
