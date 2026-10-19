@@ -2,6 +2,7 @@ import Link from "next/link";
 import { moveStageAction } from "@/modules/episodes/actions";
 import {
   boardStage,
+  directSaleMove,
   hasOpenDeal,
   nextMove,
   reachableColumns,
@@ -26,15 +27,36 @@ export function StageMove({
   episode,
   episodeId,
   canEdit,
+  canSell = false,
   compact = false,
 }: {
   episode: BoardEpisode;
   episodeId: string;
   canEdit: boolean;
+  /** sales:create — shows "Sold without listing" before the car is up for sale. */
+  canSell?: boolean;
   compact?: boolean;
 }) {
   const move = nextMove(episode, episodeId);
   if (!move) return null;
+  const direct = canSell ? directSaleMove(episode, episodeId) : null;
+  const directLink = direct ? (
+    compact ? (
+      <Link href={direct.href} className="mt-1.5 block text-xs font-medium text-amber-800 hover:underline">
+        {direct.label}
+      </Link>
+    ) : (
+      <div className="mt-3 border-t border-stone-100 pt-3">
+        <Link
+          href={direct.href}
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+        >
+          {direct.label}
+        </Link>
+        <p className="mt-1.5 text-xs text-stone-500">{direct.explains}</p>
+      </div>
+    )
+  ) : null;
 
   if (move.kind === "link") {
     return (
@@ -50,7 +72,7 @@ export function StageMove({
     );
   }
 
-  if (!canEdit) return null;
+  if (!canEdit) return directLink;
 
   const others = reachableColumns(episode);
 
@@ -63,6 +85,7 @@ export function StageMove({
         </Button>
       </form>
       {compact ? null : <p className="mt-1.5 text-xs text-stone-500">{move.explains}</p>}
+      {directLink}
 
       {!compact && others.length > 0 ? (
         <details className="mt-3">

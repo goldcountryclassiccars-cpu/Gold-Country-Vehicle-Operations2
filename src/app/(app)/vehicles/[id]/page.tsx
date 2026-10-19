@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { vehicleLabel } from "@/modules/vehicles/service";
 import { addIdentifierAction } from "@/modules/vehicles/actions";
 import { EditVehicleForm } from "./edit-vehicle-form";
-import { BOARD_TONE, boardStage, hasOpenDeal } from "@/modules/episodes/board";
+import { BOARD_TONE, boardStage, directSaleMove, hasOpenDeal } from "@/modules/episodes/board";
 import { DeleteVehicleControl } from "@/components/delete-vehicle";
 import { PhotoSection } from "@/components/photo-section";
 import { ListingSummary } from "@/components/listing-summary";
@@ -52,6 +52,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   const activeEpisode = vehicle.episodes.find((e) => e.active);
   const canDelete =
     activeEpisode != null && hasPermission(user, "episodes", "archive") && !hasOpenDeal(activeEpisode);
+  // A car can sell straight from intake without ever being listed.
+  const directSale =
+    activeEpisode && hasPermission(user, "sales", "create") ? directSaleMove(activeEpisode, activeEpisode.id) : null;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -59,8 +62,21 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         title={vehicleLabel(vehicle)}
         subtitle={vehicle.generalDescription ?? undefined}
         actions={
-          canDelete ? (
-            <DeleteVehicleControl episodeId={activeEpisode.id} stockNumber={activeEpisode.stockNumber} />
+          directSale || canDelete ? (
+            <div className="flex flex-wrap gap-2">
+              {directSale ? (
+                <Link
+                  href={directSale.href}
+                  title={directSale.explains}
+                  className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+                >
+                  {directSale.label}
+                </Link>
+              ) : null}
+              {canDelete && activeEpisode ? (
+                <DeleteVehicleControl episodeId={activeEpisode.id} stockNumber={activeEpisode.stockNumber} />
+              ) : null}
+            </div>
           ) : undefined
         }
       />

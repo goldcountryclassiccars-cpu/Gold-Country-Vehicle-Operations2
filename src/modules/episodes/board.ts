@@ -243,6 +243,30 @@ export function nextMove(e: StageInput, episodeId: string): BoardMove | null {
 }
 
 /**
+ * Selling a car that was never listed — a regular customer who buys it off the
+ * trailer, or a dealer-to-dealer sale straight from intake.
+ *
+ * Offered before the car reaches For Sale (there, "Start a deal" is already the
+ * main button). Like every deal-side move it is a link to the deal form, never
+ * a status write: the deal is what moves the car to Sold — Closing, so the
+ * buyer, price and paperwork rules come along exactly as for a listed car.
+ * Nothing about the listing changes — there isn't one to take down.
+ */
+export function directSaleMove(e: StageInput, episodeId: string): LinkMove | null {
+  if (!e.active || hasOpenDeal(e)) return null;
+  if (e.financialCloseStatus === "FINANCIALLY_CLOSED") return null;
+  const stage = boardStage(e);
+  if (stage !== "Expected" && stage !== "In Prep" && stage !== "Photos & Listing") return null;
+  return {
+    kind: "link",
+    to: "Sold — Closing",
+    label: "Sold without listing →",
+    explains: "Skip photos and listing — open the deal now. The car moves to Sold — Closing when the deal opens.",
+    href: `/sales?episode=${episodeId}`,
+  };
+}
+
+/**
  * Writes that put a car in `target`, for the "move it somewhere else" picker.
  *
  * Only the prep-side columns are offered. The deal-side ones are reachable only

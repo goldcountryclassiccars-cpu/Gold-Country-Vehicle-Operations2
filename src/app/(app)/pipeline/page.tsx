@@ -36,6 +36,7 @@ export default async function PipelinePage() {
   if (!user) redirect("/login?expired=1");
   requirePermission(user, "view", "episodes");
   const canEdit = hasPermission(user, "episodes", "edit");
+  const canSell = hasPermission(user, "sales", "create");
 
   const episodes = await db.inventoryEpisode.findMany({
     where: { AND: [episodeWhereForUser(user), { active: true }] },
@@ -111,7 +112,7 @@ export default async function PipelinePage() {
                             ${Number(e.askingPrice).toLocaleString()}
                           </p>
                         ) : null}
-                        <StageMove episode={e} episodeId={e.id} canEdit={canEdit} compact />
+                        <StageMove episode={e} episodeId={e.id} canEdit={canEdit} canSell={canSell} compact />
                       </div>
                     ))}
                   </div>

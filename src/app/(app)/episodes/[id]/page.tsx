@@ -272,7 +272,7 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
               <Badge tone={BOARD_TONE[boardStage(episode)]}>{boardStage(episode)}</Badge>
             </div>
             <p className="mt-1 text-sm text-stone-500">{BOARD_BLURB[boardStage(episode)]}</p>
-            <StageMove episode={episode} episodeId={episode.id} canEdit={canEdit} />
+            <StageMove episode={episode} episodeId={episode.id} canEdit={canEdit} canSell={hasPermission(user, "sales", "create")} />
             <StageLockedNote episode={episode} />
           </Card>
 

@@ -3,6 +3,7 @@ import {
   applyWrites,
   BOARD_COLUMNS,
   boardStage,
+  directSaleMove,
   hasOpenDeal,
   nextMove,
   reachableColumns,
@@ -171,5 +172,41 @@ describe("hasOpenDeal", () => {
     for (const s of ["HOLD", "DEPOSIT_REQUESTED", "DEPOSIT_RECEIVED", "CONTRACTED", "FUNDED", "DELIVERED"]) {
       expect(hasOpenDeal(make({ salesStatus: s })), s).toBe(true);
     }
+  });
+});
+
+describe("sold without listing", () => {
+  const base = {
+    custodyStatus: "ON_SITE",
+    reconditioningStatus: "NOT_ASSESSED",
+    marketingStatus: "NOT_READY",
+    salesStatus: "AVAILABLE",
+    documentStatus: "NOT_STARTED",
+    financialCloseStatus: "ESTIMATING",
+    active: true,
+  } as unknown as Parameters<typeof directSaleMove>[0];
+
+  it("is offered from Expected, In Prep and Photos & Listing — and links to the deal form", () => {
+    for (const e of [
+      { ...base, custodyStatus: "EXPECTED" },
+      base,
+      { ...base, reconditioningStatus: "NO_WORK_REQUIRED", marketingStatus: "MEDIA_PENDING" },
+    ]) {
+      const m = directSaleMove(e as typeof base, "ep1");
+      expect(m?.kind).toBe("link");
+      expect(m?.href).toBe("/sales?episode=ep1");
+      expect(m?.to).toBe("Sold — Closing");
+    }
+  });
+
+  it("opening the deal lands a never-listed car in Sold — Closing", () => {
+    expect(boardStage({ ...base, salesStatus: "DEPOSIT_REQUESTED" } as typeof base)).toBe("Sold — Closing");
+  });
+
+  it("is not offered once the car is for sale, on a deal, archived or closed", () => {
+    expect(directSaleMove({ ...base, marketingStatus: "LIVE" } as typeof base, "ep1")).toBeNull();
+    expect(directSaleMove({ ...base, salesStatus: "DEPOSIT_REQUESTED" } as typeof base, "ep1")).toBeNull();
+    expect(directSaleMove({ ...base, active: false } as typeof base, "ep1")).toBeNull();
+    expect(directSaleMove({ ...base, financialCloseStatus: "FINANCIALLY_CLOSED" } as typeof base, "ep1")).toBeNull();
   });
 });
